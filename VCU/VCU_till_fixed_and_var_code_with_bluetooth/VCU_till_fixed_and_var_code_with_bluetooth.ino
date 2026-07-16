@@ -2,7 +2,8 @@
 #define INCLUDE_GAMEPAD_MODULE
 #include <DabbleESP32.h>
 
-#define DAC_PIN 25
+#define DAC_PIN_RIGHT 25 //right motor
+#define DAC_PIN 26 //left
 #define REV_PIN 27
 
 bool cruiseMode = false;
