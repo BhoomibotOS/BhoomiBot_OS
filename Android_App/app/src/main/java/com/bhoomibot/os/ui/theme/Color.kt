@@ -2,6 +2,15 @@ package com.bhoomibot.os.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
+/**
+ * Color.kt — the single source of truth for BhoomiBot OS's custom color palette.
+ *
+ * These named colors are consumed by Theme.kt (which maps them onto Material 3 color
+ * roles) and are shared by every screen in the app. Change a color here and it updates
+ * consistently everywhere. The palette is tuned for an industrial dark theme with high
+ * contrast so the screen stays readable outdoors in direct sunlight.
+ */
+
 // ===== App-wide color palette (all custom colors used across every screen) =====
 
 // Darkest base color: the app background behind everything (near-black blue).

@@ -10,7 +10,20 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** Coordinates manual HMI intent. Talks to the robot only through [RobotRepository]. */
+/**
+ * State holder for [ManualControlScreen]. Coordinates manual HMI (human-machine interface)
+ * intent and talks to the robot only through [RobotRepository].
+ *
+ * Follows the app's screen pattern: this ViewModel owns the screen state in a [StateFlow]
+ * (the single source of truth) and exposes plain action methods; the Composable observes the
+ * flow and calls the actions. Keeping state here — outside the Compose layer — means it
+ * survives recomposition and configuration changes (e.g. the forced landscape rotation when
+ * the camera goes full-screen) without being rebuilt.
+ *
+ * Per-step increments and the speed ceiling are read live from [ControlCalibrationStore]
+ * (edited on the Settings screen), so retuning calibration changes drive/PTO/hydraulic
+ * behaviour here immediately.
+ */
 class ManualViewModel(application: Application) : AndroidViewModel(application) {
 
     // The repository is supplied by provideRobotRepository (fake by default, real VCU when enabled).

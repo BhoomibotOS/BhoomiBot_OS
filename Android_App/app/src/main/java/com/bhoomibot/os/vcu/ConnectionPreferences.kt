@@ -1,3 +1,10 @@
+/**
+ * Connection preferences for the LOCAL VCU / ESP32 link.
+ *
+ * Plain data class ([ConnectionPreferences]) plus the DataStore [ConnectionPreferenceKeys]. Holds
+ * the chosen [ConnectionType], Bluetooth MAC, Wi-Fi host/port, auto-reconnect flag, last-connected
+ * timestamp, and connect timeout. Persisted by `data/ConnectionPreferencesStore.kt`.
+ */
 package com.bhoomibot.os.vcu
 
 import androidx.datastore.preferences.core.stringPreferencesKey

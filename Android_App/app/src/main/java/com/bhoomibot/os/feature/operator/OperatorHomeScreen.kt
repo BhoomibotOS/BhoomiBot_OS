@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -57,6 +58,7 @@ fun OperatorHomeScreen(navController: NavController) {
     // The operator actions shown as tappable cards. Each pairs a title + icon with its nav route.
     val actions = listOf(
         OperatorAction("Manual", Icons.Default.SportsEsports, AppRoute.Manual),
+        OperatorAction("Live View", Icons.Default.Videocam, AppRoute.ConnectionOptions),
         OperatorAction("Mission Planner", Icons.Default.Map, AppRoute.MissionPlanner),
         OperatorAction("Camera", Icons.Default.CameraAlt, AppRoute.Camera),
         OperatorAction("Map", Icons.Default.Map, AppRoute.Map),

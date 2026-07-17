@@ -1,3 +1,11 @@
+/**
+ * App-level configuration store (device role, theme, language).
+ *
+ * One of THREE separate Jetpack DataStore instances in this app (the others hold VCU connection
+ * prefs and relay live-link prefs). DataStore is used instead of SharedPreferences because it is
+ * coroutine-first and lifecycle-aware. No network is involved. `role` returns null until the user
+ * picks one on Onboarding.
+ */
 package com.bhoomibot.os.data
 
 import android.content.Context

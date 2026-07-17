@@ -1,3 +1,12 @@
+/**
+ * Domain models for the robot's drive system and its live status.
+ *
+ * These are plain Kotlin data classes with NO Android dependencies, so they can be used by
+ * the UI, the ViewModels, and the transport layers alike. `DriveCommand` is the vocabulary
+ * of movement intents (FORWARD/REVERSE/LEFT/RIGHT/STOP/EMERGENCY_STOP); `RobotStatus` is a
+ * snapshot of the robot's health (battery, mode, GPS, camera, AI) shown on the dashboards.
+ * All fields have safe defaults so the UI can render before real data arrives.
+ */
 package com.bhoomibot.os.model
 
 // Every movement/stop instruction that can be sent to the robot's drive system.

@@ -1,3 +1,11 @@
+/**
+ * Persisted connection settings for the LOCAL VCU / ESP32 link (Bluetooth MAC, Wi-Fi host/port,
+ * connection mode, timeouts).
+ *
+ * Kept in its OWN DataStore, separate from [DevicePreferences] and [LiveLinkPreferencesStore], so
+ * the VCU config can evolve independently of app-level and relay config. Read via [preferences];
+ * written via [save]. Missing/unparseable keys fall back to sensible defaults.
+ */
 package com.bhoomibot.os.data
 
 import android.content.Context

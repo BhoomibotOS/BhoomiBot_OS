@@ -1,3 +1,12 @@
+/**
+ * REAL robot transport (used when `USE_REAL_TRANSPORT = true`).
+ *
+ * Drives the ESP32/VCU through [com.bhoomibot.os.vcu.ConnectionManager], which owns the actual
+ * Bluetooth/Wi-Fi socket. [RobotRepository] is deliberately non-suspend, so every command is sent
+ * fire-and-forget on a SupervisorJob + IO scope; a failed send is swallowed via runCatching so the
+ * UI never crashes. The connection is opened lazily and reused. See in-file notes for the
+ * AndroidViewModel constructor gotcha (the repository is a field, not a default param).
+ */
 package com.bhoomibot.os.repository
 
 import android.content.Context

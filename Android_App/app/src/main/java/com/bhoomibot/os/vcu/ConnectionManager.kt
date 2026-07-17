@@ -12,10 +12,19 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.UUID
 
+// CONNECTION WORLD #1: VCU / ESP32 LOCAL link. This file owns the actual on-the-field transport
+// socket (classic Bluetooth SPP or a Wi-Fi/TCP socket to the robot's hotspot). It is used ONLY by
+// the real transport (VcuRobotRepository); the default fake (LocalRobotRepository) never touches it.
+// This is NOT the internet relay ("live link") — that lives in the connection/ package.
+
 /**
  * Factory & manager that hides details of BT / Wi‑Fi from UI.
  * Call `connect()` once. It will create the required socket
  * and expose `send()` / `disconnect()`.
+ *
+ * All methods are `suspend` and do real blocking I/O off the main thread (see the Dispatchers.IO
+ * blocks below). Callers that must stay non-suspend (e.g. VcuRobotRepository) wrap these in a
+ * fire-and-forget coroutine so the UI never blocks or crashes on a send failure.
  */
 class ConnectionManager(
     private val context: Context,
@@ -24,6 +33,8 @@ class ConnectionManager(
 
     private var conn: Connection? = null
 
+    // Drops any existing connection, then builds the socket the user picked in Connection settings.
+    // AUTO tries Bluetooth first and silently falls back to Wi-Fi if the BT socket can't be created.
     suspend fun connect() {
         disconnect()
         conn = when (prefs.connectionType) {
@@ -38,6 +49,8 @@ class ConnectionManager(
         }
     }
 
+    // Throws if called before connect(); VcuRobotRepository guards against this by connecting first
+    // and swallowing any failure via runCatching, so the throw never propagates to the UI.
     suspend fun send(cmd: String) {
         conn?.send(cmd) ?: throw IllegalStateException("Not connected")
     }

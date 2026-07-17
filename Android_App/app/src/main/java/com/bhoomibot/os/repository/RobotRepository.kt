@@ -1,3 +1,11 @@
+/**
+ * The boundary every screen uses to talk to the robot.
+ *
+ * Hiding the transport behind this interface means the UI never knows whether commands go to a
+ * fake (LocalRobotRepository) or a real ESP32 (VcuRobotRepository) — you can swap them without
+ * touching any UI. This is the LOCAL VCU / Bluetooth world (making the robot move), distinct from
+ * the internet relay link in `connection/`.
+ */
 package com.bhoomibot.os.repository
 
 import com.bhoomibot.os.model.DriveCommand

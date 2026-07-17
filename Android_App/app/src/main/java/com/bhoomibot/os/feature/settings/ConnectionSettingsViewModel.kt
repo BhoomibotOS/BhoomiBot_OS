@@ -17,6 +17,9 @@ import kotlinx.coroutines.launch
  * Holds the editable [ConnectionPreferences] for the VCU connection (BT MAC, WiFi host/port,
  * mode, timeouts). Values live in memory while the screen is open and are persisted to DataStore
  * only when [save] is called, so a stray edit is never written until the operator confirms.
+ *
+ * Scope note: this configures the LOCAL VCU/ESP32 link (Bluetooth/WiFi hotspot), a different
+ * "world" from the internet relay link handled by feature/connection/.
  */
 class ConnectionSettingsViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -71,6 +74,8 @@ class ConnectionSettingsViewModel(application: Application) : AndroidViewModel(a
                     mgr.disconnect()
                 }
             }
+            // The screen decides success by checking this text starts with "Connected", so keep that
+            // prefix if you change the message.
             _testStatus.value = if (result.isSuccess) {
                 "Connected successfully"
             } else {

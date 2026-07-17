@@ -61,6 +61,12 @@ import com.bhoomibot.os.ui.theme.SafetyRed
 import com.bhoomibot.os.ui.theme.SignalGreen
 import com.bhoomibot.os.viewmodel.DashboardViewModel
 
+// Legacy operator home screen. It predates OperatorHomeScreen but is still reachable via
+// AppRoute.Dashboard. Layout is: header + an expandable robot-status card + a 2-per-row grid of
+// feature shortcuts. Unlike the newer role homes (which read static MockRobotData), this screen
+// gets its robot status from DashboardViewModel, which in turn reads RobotRepository.status().
+
+// One feature shortcut on the grid: display title + icon + the nav route tapping it opens.
 private data class DashboardFeature(val title: String, val icon: ImageVector, val route: String)
 
 @Composable

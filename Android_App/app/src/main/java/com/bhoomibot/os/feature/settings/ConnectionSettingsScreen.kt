@@ -113,6 +113,7 @@ fun ConnectionSettingsScreen(
                         Spacer(Modifier.height(10.dp))
                         OutlinedTextField(
                             value = prefs.wifiPort.toString(),
+                            // Strip any non-digits, then only push a valid number to the VM (ignores empty/garbage input).
                             onValueChange = { it.filter { c -> c.isDigit() }.toIntOrNull()?.let(viewModel::setWifiPort) },
                             label = { Text("Port") },
                             singleLine = true,
@@ -160,6 +161,8 @@ fun ConnectionSettingsScreen(
                     // Shows the outcome of the last test (green = success, red = failure).
                     testStatus?.let { status ->
                         Spacer(Modifier.height(10.dp))
+                        // Success is inferred from the VM's status text (it emits "Connected…" on success);
+                        // keep this prefix in sync with ConnectionSettingsViewModel.testConnection().
                         val success = status.startsWith("Connected")
                         Text(status, color = if (success) SignalGreen else SafetyRed, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     }

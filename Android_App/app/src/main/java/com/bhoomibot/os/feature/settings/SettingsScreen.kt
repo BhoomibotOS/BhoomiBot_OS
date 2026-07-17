@@ -27,6 +27,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bhoomibot.os.ui.theme.MutedText
 import com.bhoomibot.os.ui.theme.SignalGreen
 
+/**
+ * Settings screen — "Control Calibration". Lets the operator tune the manual-control step sizes
+ * (drive speed per tap, max speed ceiling, PTO step, hydraulic step) via four sliders, plus a
+ * card that navigates on to the VCU connection settings ([onConnectionClick]).
+ *
+ * Pure UI: it reads/edits values through [SettingsViewModel], which writes straight into the
+ * shared in-memory [ControlCalibrationStore] that [ManualViewModel] reads at drive time — so a
+ * change made here is felt on the Manual screen right away. [onBackClick] returns to the caller.
+ */
 @Composable
 fun SettingsScreen(
     onBackClick: () -> Unit,

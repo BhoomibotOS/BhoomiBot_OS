@@ -9,8 +9,11 @@ import androidx.navigation.compose.rememberNavController
 import com.bhoomibot.os.data.DevicePreferences
 import com.bhoomibot.os.feature.autonomous.AutonomousScreen
 import com.bhoomibot.os.feature.camera.CameraScreen
+import com.bhoomibot.os.feature.connection.ConnectionOptionsScreen
 import com.bhoomibot.os.feature.dashboard.DashboardScreen
 import com.bhoomibot.os.feature.diagnostics.DiagnosticsScreen
+import com.bhoomibot.os.feature.live.OperatorLiveScreen
+import com.bhoomibot.os.feature.live.RobotLiveScreen
 import com.bhoomibot.os.feature.manual.ManualControlScreen
 import com.bhoomibot.os.feature.map.MapScreen
 import com.bhoomibot.os.feature.onboarding.OnboardingScreen
@@ -21,6 +24,12 @@ import com.bhoomibot.os.feature.settings.SettingsScreen
 import com.bhoomibot.os.feature.settings.ConnectionSettingsScreen
 import com.bhoomibot.os.model.DeviceRole
 import kotlinx.coroutines.launch
+
+// The app's navigation module. This single file owns BOTH the list of route strings (AppRoute)
+// and the NavHost graph (AppNavigation) that maps each route to the composable screen it shows.
+// The app is single-Activity: MainActivity hosts AppNavigation(), which swaps screens in-place
+// instead of launching new Activities. New screens are added by (1) adding a route constant to
+// AppRoute and (2) adding a matching composable(...) entry in the NavHost below.
 
 // Central list of every screen route. The role homes + onboarding are the new entries.
 object AppRoute {
@@ -35,8 +44,14 @@ object AppRoute {
     const val Map = "map"
     const val Settings = "settings"
     const val ConnectionSettings = "connectionSettings"
+    const val ConnectionOptions = "connectionOptions"
+    const val RobotLive = "robotLive"
+    const val OperatorLive = "operatorLive"
     const val MissionPlanner = "missionPlanner"
     const val Notifications = "notifications"
+    // A parameterized route: {title}/{subtitle} are path arguments filled in at navigation time.
+    // Use the robotSection(...) helper to build a concrete route (e.g. "robotSection/Logs/System event log");
+    // the composable(AppRoute.RobotSection) block below reads those arguments back out.
     const val RobotSection = "robotSection/{title}/{subtitle}"
     fun robotSection(title: String, subtitle: String) = "robotSection/$title/$subtitle"
 }
@@ -80,6 +95,28 @@ fun AppNavigation() {
             )
         }
         composable(AppRoute.ConnectionSettings) { ConnectionSettingsScreen(onBackClick = navController::popBackStack) }
+        // Live internet link: configure the relay, then the robot/operator go live.
+        composable(AppRoute.ConnectionOptions) {
+            ConnectionOptionsScreen(
+                onBackClick = navController::popBackStack,
+                onStart = { role ->
+                    val dest = if (role == DeviceRole.ROBOT) AppRoute.RobotLive else AppRoute.OperatorLive
+                    navController.navigate(dest) { popUpTo(AppRoute.ConnectionOptions) { inclusive = true } }
+                }
+            )
+        }
+        composable(AppRoute.RobotLive) {
+            RobotLiveScreen(
+                onBackClick = navController::popBackStack,
+                onOpenOptions = { navController.navigate(AppRoute.ConnectionOptions) }
+            )
+        }
+        composable(AppRoute.OperatorLive) {
+            OperatorLiveScreen(
+                onBackClick = navController::popBackStack,
+                onOpenOptions = { navController.navigate(AppRoute.ConnectionOptions) }
+            )
+        }
         // Operator extras.
         composable(AppRoute.MissionPlanner) { MissionPlannerScreen(onBackClick = navController::popBackStack) }
         composable(AppRoute.Notifications) { NotificationsScreen(onBackClick = navController::popBackStack) }

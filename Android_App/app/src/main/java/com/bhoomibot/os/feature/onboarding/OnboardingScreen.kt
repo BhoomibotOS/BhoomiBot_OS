@@ -41,6 +41,9 @@ import com.bhoomibot.os.ui.theme.SignalGreen
 
 // First-launch screen. Lets the user pick which physical role this phone serves.
 // The choice is saved by the caller (AppNavigation/ViewModel) and persists across launches.
+// NOTE: despite "first-launch", by current design this role picker is the start destination on
+// EVERY app launch (see AppNavigation.startDestination) — the persisted role is not auto-restored.
+// onRoleSelected fires with OPERATOR or ROBOT; the caller persists it and routes to the matching home.
 @Composable
 fun OnboardingScreen(onRoleSelected: (DeviceRole) -> Unit) {
     Column(

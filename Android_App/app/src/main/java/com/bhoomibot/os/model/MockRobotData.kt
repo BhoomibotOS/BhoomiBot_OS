@@ -1,3 +1,9 @@
+/**
+ * Static, hard-coded robot state used across the Operator and Robot homes.
+ *
+ * This is a GUI-only placeholder so the screens render real-looking data without a paired robot.
+ * Swap these objects for a real repository / ESP32 source later WITHOUT touching any UI code.
+ */
 package com.bhoomibot.os.model
 
 // Realistic, hard-coded robot state used across Operator and Robot homes.

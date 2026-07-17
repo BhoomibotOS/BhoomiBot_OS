@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: bhoomibot-live-relay
+    runtime: node
+    rootDir: server/relay
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    plan: free
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1

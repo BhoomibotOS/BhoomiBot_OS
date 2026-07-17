@@ -1,3 +1,10 @@
+/**
+ * Single decision point for which [RobotRepository] the app uses.
+ *
+ * `USE_REAL_TRANSPORT = false` (default) returns the no-op [LocalRobotRepository] so the app runs
+ * with no robot paired. Set it `true` ONLY after the ESP32 firmware parses the raw serial protocol
+ * in `vcu/VcuProtocol.kt` (today's firmware speaks Dabble BLE, not raw serial — see the in-file note).
+ */
 package com.bhoomibot.os.repository
 
 import android.app.Application

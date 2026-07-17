@@ -1,3 +1,14 @@
+import java.io.FileInputStream
+import java.util.Properties
+
+// Load release signing credentials from a gitignored file (app/keystore.properties).
+val keystoreProperties = Properties().apply {
+    val propsFile = file("keystore.properties")
+    if (propsFile.exists()) {
+        load(FileInputStream(propsFile))
+    }
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -21,8 +32,18 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            keystoreProperties.getProperty("STORE_FILE")?.let { storeFile = file(it) }
+            keystoreProperties.getProperty("STORE_PASSWORD")?.let { storePassword = it }
+            keystoreProperties.getProperty("KEY_ALIAS")?.let { keyAlias = it }
+            keystoreProperties.getProperty("KEY_PASSWORD")?.let { keyPassword = it }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             optimization {
                 enable = false
             }
@@ -48,6 +69,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    // Live internet link (robot<->operator over WebSocket).
+    implementation(libs.okhttp)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
@@ -56,6 +79,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation("androidx.compose.material:material-icons-extended")
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.orgjson)
     implementation("androidx.navigation:navigation-compose:2.9.3")
     implementation("androidx.camera:camera-camera2:1.6.1")
     implementation("androidx.camera:camera-lifecycle:1.6.1")

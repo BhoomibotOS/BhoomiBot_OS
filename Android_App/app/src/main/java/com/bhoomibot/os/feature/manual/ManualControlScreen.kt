@@ -86,6 +86,23 @@ import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 
+/**
+ * Manual drive screen (OPERATOR role) — the "handheld remote" for the field robot.
+ *
+ * This file is pure UI: it renders [ManualUiState] and forwards user gestures to
+ * [ManualViewModel] actions. It never touches the robot transport directly — every command
+ * goes ViewModel → RobotRepository (fake/no-op by default). Reached from the dashboard;
+ * [onBackClick] returns there.
+ *
+ * Layout (top → bottom, vertically scrollable): status strip + E-STOP, camera preview card,
+ * DIGITAL/JOYSTICK mode selector, speed read-out, the active drive control, PTO, hydraulic
+ * lift, and the quick-toggles row (work lights / horn / camera light / learning). Opening the
+ * camera full-screen swaps the whole layout for [MaximizedCameraOverlay] (forced landscape).
+ *
+ * NOTE: three composables below — [PrimaryLightsControl], [CompactStatus] and [ManualBottomBar]
+ * — are RESERVED. They compile and are kept for a planned redesign but are not called from the
+ * layout yet, so they render nowhere at runtime.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManualControlScreen(onBackClick: () -> Unit, viewModel: ManualViewModel = viewModel()) {

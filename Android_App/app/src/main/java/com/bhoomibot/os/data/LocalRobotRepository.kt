@@ -1,3 +1,11 @@
+/**
+ * In-memory, no-op implementation of [com.bhoomibot.os.repository.RobotRepository].
+ *
+ * This is the DEFAULT robot "transport" (selected by `USE_REAL_TRANSPORT = false`). Every command
+ * is a safe no-op and [status] returns default values, so the app runs with NO robot paired. Swap
+ * for [com.bhoomibot.os.repository.VcuRobotRepository] only after the ESP32 firmware can parse the
+ * serial protocol in `vcu/VcuProtocol.kt`.
+ */
 package com.bhoomibot.os.data
 
 import com.bhoomibot.os.model.DriveCommand

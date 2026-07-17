@@ -4,7 +4,12 @@ import androidx.lifecycle.ViewModel
 import com.bhoomibot.os.data.ControlCalibrationStore
 import kotlinx.coroutines.flow.StateFlow
 
-// Holds the calibration values shown/edited on the Settings screen and writes changes back to the store.
+// State holder for [SettingsScreen]. Exposes the calibration values and writes edits back.
+//
+// Unlike the connection ViewModels, this one is a plain ViewModel (no Application needed): it
+// neither loads from DataStore nor persists on Save. It reads/writes ControlCalibrationStore,
+// an in-memory singleton shared with ManualViewModel, so slider changes take effect live and
+// are simply the current values — they are NOT persisted across app restarts.
 class SettingsViewModel : ViewModel() {
     // Live calibration values the Settings UI displays. Updates automatically when changed.
     val calibration: StateFlow<com.bhoomibot.os.model.ControlCalibration> = ControlCalibrationStore.calibration

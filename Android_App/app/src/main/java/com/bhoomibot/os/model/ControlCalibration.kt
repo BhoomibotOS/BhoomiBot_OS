@@ -1,3 +1,11 @@
+/**
+ * Operator-configurable increments used by the Manual controls.
+ *
+ * Edited in Settings and held in the in-memory [com.bhoomibot.os.data.ControlCalibrationStore]
+ * (Settings writes, Manual reads). `driveStepMetersPerSecond` is how much each digital drive tap
+ * adds; `maximumSpeedMetersPerSecond` is the hard ceiling; the `*StepPercent` values are the jump
+ * size for the PTO / hydraulic sliders.
+ */
 package com.bhoomibot.os.model
 
 /** Operator-configurable increments used by manual controls.

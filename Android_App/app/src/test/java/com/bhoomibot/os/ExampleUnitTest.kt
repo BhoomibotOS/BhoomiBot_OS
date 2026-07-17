@@ -4,6 +4,8 @@ import org.junit.Test
 
 import org.junit.Assert.*
 
+// NOTE: Default Android Studio scaffolding / placeholder — not a real test of app logic.
+// Safe to replace with actual JVM unit tests for this module.
 /**
  * Example local unit test, which will execute on the development machine (host).
  *

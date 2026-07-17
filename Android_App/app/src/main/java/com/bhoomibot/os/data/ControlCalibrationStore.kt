@@ -1,3 +1,10 @@
+/**
+ * Shared IN-MEMORY calibration source (NOT persisted — resets on app restart).
+ *
+ * A single global [MutableStateFlow] of [com.bhoomibot.os.model.ControlCalibration]. The Settings
+ * screen writes here via [update]; the Manual screen reads [calibration]. Persist with DataStore
+ * later once the vehicle setup is finalized.
+ */
 package com.bhoomibot.os.data
 
 import com.bhoomibot.os.model.ControlCalibration

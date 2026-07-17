@@ -8,6 +8,8 @@ import org.junit.runner.RunWith
 
 import org.junit.Assert.*
 
+// NOTE: Default Android Studio scaffolding / placeholder — not a real test of app behavior.
+// Safe to replace with actual on-device instrumented tests.
 /**
  * Instrumented test, which will execute on an Android device.
  *

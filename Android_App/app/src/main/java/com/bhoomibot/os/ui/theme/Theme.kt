@@ -6,6 +6,15 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
+/**
+ * Theme.kt — defines the app's Material 3 theme.
+ *
+ * It builds two color schemes (dark + light) from the custom palette in Color.kt and
+ * exposes the [BhoomiBotTheme] composable that every screen wraps its content in.
+ * The active scheme is chosen by the darkTheme flag, which flows from DevicePreferences
+ * through MainActivity down into this composable.
+ */
+
 // The dark color scheme used by the whole app (high contrast for outdoor/sunlight use).
 // Each line maps a Material 3 role to one of our custom colors from Color.kt:
 //   primary        -> SignalGreen : main brand color (buttons, active switches, progress)

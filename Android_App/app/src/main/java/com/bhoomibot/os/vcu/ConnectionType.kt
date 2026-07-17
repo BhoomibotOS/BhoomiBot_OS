@@ -1,3 +1,7 @@
+/**
+ * How the phone reaches the VCU/ESP32: classic Bluetooth, Wi-Fi hotspot, or AUTO (tries Bluetooth
+ * first, then Wi-Fi). Each entry carries a display name / description / icon for the settings UI.
+ */
 package com.bhoomibot.os.vcu
 
 /**

@@ -9,8 +9,12 @@ enum class DrivingMode {
     JOYSTICK  // Drag a virtual joystick
 }
 
-/** Immutable screen state; transport remains outside the Compose layer.
- *  Everything the Manual screen displays is derived from this single object. */
+/**
+ * Immutable snapshot of everything [ManualControlScreen] displays; produced by [ManualViewModel]
+ * and consumed (read-only) by the Composables. It carries UI state only — the actual robot
+ * transport (RobotRepository) stays in the ViewModel, outside the Compose layer. Each action
+ * emits a fresh copy via `copy(...)`, so Compose re-renders just the parts that changed.
+ */
 data class ManualUiState(
     val robotStatus: RobotStatus = RobotStatus(),      // Battery/mode/GPS/camera/AI snapshot shown at top
     val drivingMode: DrivingMode = DrivingMode.DIGITAL, // Which drive control is active (DIGITAL or JOYSTICK)

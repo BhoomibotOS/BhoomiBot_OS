@@ -1,3 +1,10 @@
+/**
+ * The two physical roles a single BhoomiBot APK can serve.
+ *
+ * Chosen once at first launch (Onboarding) and persisted in [com.bhoomibot.os.data.DevicePreferences].
+ * The app routes to OperatorHome (handheld controller) or RobotHome (phone on the robot) based on
+ * this value. The `toKey()`/`toDeviceRole()` helpers persist the enum as a stable string.
+ */
 package com.bhoomibot.os.model
 
 // The two physical roles a single BhoomiBot APK can serve.

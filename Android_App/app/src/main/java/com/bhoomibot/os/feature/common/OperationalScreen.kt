@@ -25,7 +25,11 @@ import com.bhoomibot.os.ui.theme.MutedText
 import com.bhoomibot.os.ui.theme.SignalGreen
 
 /** Consistent shell for non-control operational modules while their data sources are integrated.
- *  Used by Camera, Diagnostics, Map and Autonomous as a temporary "not built yet" placeholder screen. */
+ *  Used by Camera, Diagnostics, Map and Autonomous as a temporary "not built yet" placeholder screen.
+ *
+ *  Unlike the real feature screens, this one is fully stateless — no ViewModel or UiState. It just
+ *  renders the [title]/[subtitle] passed in plus a fixed "Module ready" card, so a single Composable
+ *  can stand in for several not-yet-built modules. */
 @Composable
 fun OperationalScreen(title: String, subtitle: String, onBackClick: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
