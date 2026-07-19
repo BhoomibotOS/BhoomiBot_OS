@@ -1,2 +1,6 @@
 node_modules/
 npm-debug.log*
+
+# Runtime artifacts (regenerated on every start; never commit)
+server.log
+server.pid

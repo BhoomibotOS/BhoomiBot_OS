@@ -1,0 +1,3 @@
+# Windows "NUL" device occasionally materializes as a file on this repo.
+# It is not a source file and breaks `git add` on Windows — ignore it.
+nul
