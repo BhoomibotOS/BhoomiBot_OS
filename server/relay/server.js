@@ -42,6 +42,13 @@ function safeType(data) {
 }
 // =================================================================================
 
+// Last line of defence: a single failed write to a dead peer (EPIPE) or any
+// other unexpected error must never crash the relay and drop every connected
+// phone. Swallow uncaught exceptions/rejections, log them, and keep the process
+// (and the other peers) alive. Dead sockets are pruned by the try/catch above.
+process.on('uncaughtException', (e) => dlog('UNCAUGHT', e && e.message));
+process.on('unhandledRejection', (e) => dlog('UNHANDLED_REJECTION', e && (e && e.message)));
+
 const app = express();
 // Log every HTTP request (health checks, root, etc.) with caller IP + User-Agent.
 app.use((req, res, next) => {
@@ -87,7 +94,17 @@ function broadcastPeerStatus(set) {
     retry: 0
   });
   for (const c of set) {
-    if (c.readyState === c.OPEN) c.send(msg);
+    if (c.readyState === c.OPEN) {
+      // A peer's TCP connection can die without a clean close (network drop,
+      // WiFi<->cellular handoff, or the phone's battery saver killing the
+      // socket). readyState may still report OPEN, so the write throws EPIPE.
+      // Guard it: a failed send must not crash the relay or drop the other peer.
+      try { c.send(msg); }
+      catch (e) {
+        dlog('PEER_STATUS-SEND-FAIL', 'to=', c.id, 'reason=', e && e.message);
+        try { c.terminate(); } catch (_e) { /* already gone */ }
+      }
+    }
   }
 }
 
@@ -134,8 +151,21 @@ wss.on('connection', (ws, req) => {
     if (!set) return;
     for (const c of set) {
       if (c !== ws && c.readyState === c.OPEN) {
-        if (isBinary) { c.send(data); dlog('SEND', 'from=', ws.id, 'to=', c.id, 'binary=true', 'bytes=', data.length); }
-        else { c.send(data.toString()); dlog('SEND', 'from=', ws.id, 'to=', c.id, 'binary=false', 'bytes=', data.toString().length); }
+        // Same dead-peer hazard as broadcastPeerStatus: a vanished socket can
+        // still report OPEN, so the write throws EPIPE. Guard it and prune the
+        // dead socket instead of letting the exception propagate.
+        try {
+          if (isBinary) {
+            c.send(data);
+            dlog('SEND', 'from=', ws.id, 'to=', c.id, 'binary=true', 'bytes=', data.length);
+          } else {
+            c.send(data.toString());
+            dlog('SEND', 'from=', ws.id, 'to=', c.id, 'binary=false', 'bytes=', data.toString().length);
+          }
+        } catch (e) {
+          dlog('SEND-FAIL', 'to=', c.id, 'reason=', e && e.message);
+          try { c.terminate(); } catch (_e) { /* already gone */ }
+        }
       }
     }
   });
