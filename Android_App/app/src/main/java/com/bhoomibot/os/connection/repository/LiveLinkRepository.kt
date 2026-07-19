@@ -24,6 +24,9 @@ interface LiveLinkRepository {
     /** Socket lifecycle (IDLE / CONNECTING / CONNECTED / RECONNECTING / ERROR). */
     val connectionState: StateFlow<LiveConnectionState>
 
+    /** Last human-readable connection failure reason (null when healthy). */
+    val connectionError: StateFlow<String?>
+
     /** Who is present in the session (relay's PEER_STATUS broadcasts). */
     val peerStatus: StateFlow<PeerStatus>
 

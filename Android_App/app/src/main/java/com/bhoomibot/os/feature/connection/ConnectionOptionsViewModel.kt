@@ -60,10 +60,12 @@ class ConnectionOptionsViewModel(application: Application) : AndroidViewModel(ap
     fun save(onSaved: () -> Unit = {}) {
         viewModelScope.launch {
             val s = _uiState.value
+            // Persist the normalized (wss://) URL so the live screens read a usable
+            // address even if the user typed https://.
             LiveLinkPreferencesStore.save(
                 getApplication(),
                 LiveLinkPreferences(
-                    serverUrl = s.serverUrl,
+                    serverUrl = s.normalizedServerUrl,
                     robotId = s.robotId,
                     sessionCode = s.sessionCode,
                     autoReconnect = s.autoReconnect,
@@ -73,6 +75,11 @@ class ConnectionOptionsViewModel(application: Application) : AndroidViewModel(ap
                 )
             )
             _uiState.value = s.copy(saved = true)
+            android.util.Log.d(
+                "BhoomiBotRelay",
+                "[GUI] save() persisted serverUrl='${s.normalizedServerUrl}' robotId='${s.robotId}' " +
+                    "session='${s.sessionCode}' role=${s.role}; invoking onStart()"
+            )
             onSaved()
         }
     }
@@ -81,7 +88,7 @@ class ConnectionOptionsViewModel(application: Application) : AndroidViewModel(ap
     fun toConfig(): ConnectionConfig {
         val s = _uiState.value
         return ConnectionConfig(
-            serverUrl = s.serverUrl,
+            serverUrl = s.normalizedServerUrl,
             robotId = s.robotId,
             sessionCode = s.sessionCode,
             role = s.role,

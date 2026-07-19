@@ -29,6 +29,9 @@ interface LiveLinkClient {
     /** Socket lifecycle state. */
     val connectionState: StateFlow<LiveConnectionState>
 
+    /** Last human-readable connection failure reason (null when healthy). */
+    val lastError: StateFlow<String?>
+
     fun connect()
     fun disconnect()
     fun send(envelope: LiveEnvelope)

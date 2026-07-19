@@ -12,6 +12,7 @@
 // ============================================================================
 package com.bhoomibot.os.connection.repository
 
+import com.bhoomibot.os.connection.model.ConnectionConfig
 import com.bhoomibot.os.connection.model.LiveEnvelope
 import com.bhoomibot.os.connection.model.LiveFrame
 import com.bhoomibot.os.connection.transport.LiveConnectionState
@@ -28,17 +29,23 @@ class FakeLiveLinkClient : com.bhoomibot.os.connection.transport.LiveLinkClient 
     var disconnectCalls = 0
     val sentFrames = mutableListOf<ByteArray>()
     val sentEnvelopes = mutableListOf<LiveEnvelope>()
+    var latestConfig: ConnectionConfig? = null
 
     private val _state = MutableStateFlow(LiveConnectionState.IDLE)
     private val _messages = MutableSharedFlow<LiveEnvelope>(extraBufferCapacity = 64)
     private val _frames = MutableSharedFlow<LiveFrame>(extraBufferCapacity = 64)
+    private val _lastError = MutableStateFlow<String?>(null)
 
     override val messages: Flow<LiveEnvelope> = _messages.asSharedFlow()
     override val frames: Flow<LiveFrame> = _frames.asSharedFlow()
     override val connectionState: StateFlow<LiveConnectionState> = _state.asStateFlow()
+    override val lastError: StateFlow<String?> = _lastError.asStateFlow()
 
     override fun connect() { connectCalls++; _state.value = LiveConnectionState.CONNECTED }
     override fun disconnect() { disconnectCalls++; _state.value = LiveConnectionState.IDLE }
+    // The real socket saves this config for its next connection; retaining it here lets tests
+    // verify the same repository-to-transport handoff without opening a network connection.
+    override fun updateConfig(config: ConnectionConfig) { latestConfig = config }
     override fun send(envelope: LiveEnvelope) { sentEnvelopes.add(envelope) }
     override fun sendFrame(jpeg: ByteArray) { sentFrames.add(jpeg) }
 

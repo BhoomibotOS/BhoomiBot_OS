@@ -31,10 +31,11 @@ import kotlinx.coroutines.launch
  * Inbound JSON messages are fanned out into telemetry / peer-status / commands.
  */
 class LiveLinkRepositoryImpl(
-    private val client: LiveLinkClient = WebSocketLiveLinkClient(ConnectionConfig())
+    private val client: LiveLinkClient = WebSocketLiveLinkClient(ConnectionConfig()),
+    // Production uses a self-owned background scope. Tests pass runTest's scope so they can
+    // advance the collector deterministically instead of racing a real Dispatchers.Default thread.
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 ) : LiveLinkRepository {
-
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     private val _peerStatus = MutableStateFlow(PeerStatus())
     private val _telemetry = MutableStateFlow(TelemetrySnapshot())
@@ -42,12 +43,17 @@ class LiveLinkRepositoryImpl(
     private var currentRobotId: String = ""
 
     override val connectionState: kotlinx.coroutines.flow.StateFlow<LiveConnectionState> = client.connectionState
+    override val connectionError: kotlinx.coroutines.flow.StateFlow<String?> = client.lastError
     override val frames: Flow<LiveFrame> = client.frames
     override val peerStatus: kotlinx.coroutines.flow.StateFlow<PeerStatus> = _peerStatus.asStateFlow()
     override val telemetry: kotlinx.coroutines.flow.StateFlow<TelemetrySnapshot> = _telemetry.asStateFlow()
     override val incomingCommands: Flow<RobotCommand> = _incomingCommands.asSharedFlow()
 
     override fun connect(config: ConnectionConfig) {
+        android.util.Log.d(
+            "BhoomiBotRelay",
+            "[PIPELINE] LiveLinkRepositoryImpl.connect() ENTERED config=serverUrl='${config.serverUrl}' robotId='${config.robotId}' session='${config.sessionCode}' role=${config.role}"
+        )
         currentRobotId = config.robotId // remembered so outbound envelopes can be stamped
         // Restart the fan-out collector for this session (cancel any previous one).
         collectorJob?.cancel()
@@ -56,6 +62,10 @@ class LiveLinkRepositoryImpl(
             // right role-specific flow. Anything unrecognized (HELLO, PING, ERROR...)
             // is ignored here via the `else` branch. Undecodable payloads are dropped.
             client.messages.collect { env ->
+                android.util.Log.d(
+                    "BhoomiBotRelay",
+                    "[PIPELINE] received envelope type=${env.type} robotId=${env.robotId}"
+                )
                 when (LiveMessageType.from(env.type)) {
                     LiveMessageType.TELEMETRY ->
                         LivePayloads.decodeTelemetry(env.payload)?.let { _telemetry.value = it }
@@ -69,8 +79,10 @@ class LiveLinkRepositoryImpl(
         }
         // Push the new config into the (reused) client, THEN open the socket. Order
         // matters: updateConfig must land before connect() so HELLO uses this session.
+        android.util.Log.d("BhoomiBotRelay", "[PIPELINE] calling client.updateConfig() -> client.connect()")
         client.updateConfig(config)
         client.connect()
+        android.util.Log.d("BhoomiBotRelay", "[PIPELINE] LiveLinkRepositoryImpl.connect() COMPLETED")
     }
 
     override fun disconnect() {

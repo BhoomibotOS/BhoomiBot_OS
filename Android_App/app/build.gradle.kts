@@ -81,6 +81,9 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.orgjson)
+    // Lets unit tests open a real local WebSocket endpoint to prove the live-link
+    // client actually dials the relay (not just flips a UI flag). Matches libs.okhttp.
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     implementation("androidx.navigation:navigation-compose:2.9.3")
     implementation("androidx.camera:camera-camera2:1.6.1")
     implementation("androidx.camera:camera-lifecycle:1.6.1")

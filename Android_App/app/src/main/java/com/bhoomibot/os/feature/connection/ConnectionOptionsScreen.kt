@@ -40,6 +40,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import com.bhoomibot.os.connection.model.VideoQuality
 import com.bhoomibot.os.model.DeviceRole
 import com.bhoomibot.os.ui.theme.MutedText
@@ -59,6 +61,7 @@ fun ConnectionOptionsScreen(
     viewModel: ConnectionOptionsViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     Column(
         Modifier
             .fillMaxSize()
@@ -122,6 +125,15 @@ fun ConnectionOptionsScreen(
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(Modifier.padding(16.dp)) {
                     Text("RELAY SERVER", fontWeight = FontWeight.ExtraBold)
+                    Text(
+                        if (state.networkMode == PhoneNetworkMode.INTERNET) {
+                            "Different networks uses the secure Render address: wss://bhoomibot-os.onrender.com"
+                        } else {
+                            "For a local relay, use ws://<phone-or-computer-IP>:8080. A secure wss:// URL also works."
+                        },
+                        color = MutedText,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                     Text("Use the relay's secure internet URL (wss://…). Use ws:// only on a trusted local network.", color = MutedText, style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
@@ -129,7 +141,9 @@ fun ConnectionOptionsScreen(
                         onValueChange = viewModel::setServerUrl,
                         label = { Text("Server URL (ws://…)") },
                         singleLine = true,
+                        isError = state.serverUrlError != null,
                         leadingIcon = { Icon(Icons.Default.Wifi, null) },
+                        supportingText = state.serverUrlError?.let { error -> { Text(error) } },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -220,7 +234,22 @@ fun ConnectionOptionsScreen(
 
             // Save + start.
             Button(
-                onClick = { viewModel.save { onStart(state.role) } },
+                onClick = {
+                    android.util.Log.d(
+                        "BhoomiBotRelay",
+                        "[GUI] SAVE&START clicked — serverUrl='${state.serverUrl}' " +
+                            "normalized='${state.normalizedServerUrl}' robotId='${state.robotId}' " +
+                            "session='${state.sessionCode}' role=${state.role} " +
+                            "networkMode=${state.networkMode} canStart=${state.canStart}"
+                    )
+                    // Visible on-screen confirmation (no terminal needed).
+                    Toast.makeText(
+                        context,
+                        "Connecting to: ${state.normalizedServerUrl}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    viewModel.save { onStart(state.role) }
+                },
                 enabled = state.canStart,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = SignalGreen, contentColor = MaterialTheme.colorScheme.onPrimary)

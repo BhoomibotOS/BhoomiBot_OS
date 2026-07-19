@@ -101,6 +101,10 @@ fun AppNavigation() {
                 onBackClick = navController::popBackStack,
                 onStart = { role ->
                     val dest = if (role == DeviceRole.ROBOT) AppRoute.RobotLive else AppRoute.OperatorLive
+                    android.util.Log.d(
+                        "BhoomiBotRelay",
+                        "[GUI] onStart(role=$role) -> navigating to ${if (role == DeviceRole.ROBOT) "RobotLive" else "OperatorLive"}"
+                    )
                     navController.navigate(dest) { popUpTo(AppRoute.ConnectionOptions) { inclusive = true } }
                 }
             )
