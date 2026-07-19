@@ -25,15 +25,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -41,9 +45,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.widget.Toast
+import com.bhoomibot.os.connection.transport.LiveConnectionState
+import com.bhoomibot.os.ui.theme.SafetyRed
 import com.bhoomibot.os.ui.theme.SignalGreen
 
 /**
@@ -61,6 +69,18 @@ fun OperatorLiveScreen(
     // the ViewModel pushes a new OperatorLiveUiState, `state` updates and the UI
     // recomposes. `by` delegates so we can read fields directly as `state.xxx`.
     val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    // Surface connection-state changes as on-screen Toasts (no terminal needed).
+    LaunchedEffect(state.connectionState) {
+        val msg = when (state.connectionState) {
+            LiveConnectionState.CONNECTED -> "OPERATOR: Connected to relay (Live)"
+            LiveConnectionState.CONNECTING -> "OPERATOR: Connecting to relay…"
+            LiveConnectionState.RECONNECTING -> "OPERATOR: Connection lost — reconnecting…"
+            LiveConnectionState.ERROR -> "OPERATOR: Connection failed (Offline)"
+            LiveConnectionState.IDLE -> "OPERATOR: Idle"
+        }
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+    }
 
     // Everything is stacked in a Box so the video fills the screen and the
     // controls/overlays float on top of it, anchored to different corners.
@@ -103,6 +123,28 @@ fun OperatorLiveScreen(
             IconButton(onClick = onOpenOptions) { Icon(Icons.Default.Settings, "Options", tint = Color.White) }
         }
 
+        // Error banner: if the link failed or an unexpected error occurred, show
+        // it with a Retry button instead of leaving the user on a dead screen.
+        if (state.error != null || state.connectionState == LiveConnectionState.ERROR) {
+            Column(
+                Modifier.align(Alignment.TopCenter)
+                    .padding(top = 64.dp, start = 12.dp, end = 12.dp)
+                    .background(SafetyRed.copy(alpha = 0.92f), RoundedCornerShape(12.dp))
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    state.error ?: "Connection failed. Check the relay URL, Robot ID and session code, then retry.",
+                    color = Color.White, style = MaterialTheme.typography.labelMedium
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = viewModel::retry,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = SafetyRed)
+                ) { Text("Retry", fontWeight = FontWeight.Bold) }
+            }
+        }
+
         // Telemetry overlay (top-right).
         TelemetryOverlay(
             state.telemetry,
@@ -126,6 +168,13 @@ fun OperatorLiveScreen(
             onDrive = viewModel::sendDrive,
             onEmergencyStop = viewModel::sendEmergencyStop,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)
+        )
+
+        // Diagnostic: this phone's role + Robot ID + session so a role/key
+        // mismatch (the usual "connected but no video" cause) is visible.
+        SessionInfoChip(
+            state.activeRole, state.activeRobotId, state.activeSession,
+            Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
         )
     }
 }

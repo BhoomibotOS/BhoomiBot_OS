@@ -1,6 +1,10 @@
 services:
   - type: web
-    name: bhoomibot-live-relay
+    # Must match the ALREADY-DEPLOYED service (verified live at
+    # https://bhoomibot-os.onrender.com). The Android app, its UI hint, and the
+    # integration test all target wss://bhoomibot-os.onrender.com — a mismatch
+    # here would silently change the URL on next deploy and break every phone.
+    name: bhoomibot-os
     runtime: node
     rootDir: server/relay
     buildCommand: npm ci
@@ -10,3 +14,4 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20.11.1
+      # Live relay URL consumed by the Android app: wss://bhoomibot-os.onrender.com

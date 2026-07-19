@@ -24,6 +24,8 @@ import com.bhoomibot.os.connection.transport.FrameDecoder
 import com.bhoomibot.os.data.LiveLinkPreferencesStore
 import com.bhoomibot.os.model.DeviceRole
 import com.bhoomibot.os.model.DriveCommand
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,11 +46,17 @@ import kotlinx.coroutines.launch
 // have defaults so that factory path still works; the defaults are also the seam
 // for tests to inject a fake repository / a decoder that doesn't need Android's
 // BitmapFactory.
-class OperatorLiveViewModel(
-    application: Application,
-    internal var repository: LiveLinkRepository = provideLiveLinkRepository(application),
+class OperatorLiveViewModel(application: Application) : AndroidViewModel(application) {
+
+    // Injected dependencies are FIELDS (not constructor params) so the default
+    // ViewModel factory used by viewModel() can build this with the sole
+    // (Application) constructor it requires. A Kotlin class whose primary
+    // constructor has defaulted params does NOT synthesize a (Application)-only
+    // constructor, so viewModel() would reflectively call getConstructor(Application)
+    // and throw NoSuchMethodException — crashing the operator screen on open. This
+    // is the same pattern as RobotLiveViewModel / ManualViewModel (see their notes).
+    internal var repository: LiveLinkRepository = provideLiveLinkRepository(application)
     private val decoder: FrameDecoder = AndroidFrameDecoder()
-) : AndroidViewModel(application) {
 
     // _uiState is the private, mutable source of truth; uiState is the read-only
     // view the screen observes. Screen state is only ever changed through this.
@@ -58,14 +66,22 @@ class OperatorLiveViewModel(
     // The connection settings, built once from saved preferences (see init).
     private var config: ConnectionConfig? = null
 
+    // Any unexpected exception in the coroutines below is caught here and shown to
+    // the user as an error message instead of crashing the whole app (which would
+    // otherwise look like "the app minimized"). This is the safety net that lets
+    // the operator connect without the app dying on an unforeseen error.
+    private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        _uiState.update { it.copy(error = throwable.message ?: "Unexpected error during live link") }
+    }
+
     init {
         // First coroutine: read saved settings once (first() takes a single value
         // from the preferences flow), build the OPERATOR connection config, and
         // open the link. valueOf can throw if a stored quality string is invalid,
         // so runCatching falls back to MEDIUM.
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             val prefs = LiveLinkPreferencesStore.preferences(application).first()
-            config = ConnectionConfig(
+            val cfg = ConnectionConfig(
                 serverUrl = prefs.serverUrl,
                 robotId = prefs.robotId,
                 sessionCode = prefs.sessionCode,
@@ -75,19 +91,39 @@ class OperatorLiveViewModel(
                 videoQuality = runCatching { VideoQuality.valueOf(prefs.videoQuality) }
                     .getOrDefault(VideoQuality.MEDIUM)
             )
-            repository.connect(config!!)
+            config = cfg
+            // Surface the role + meet-keys this phone is actually using, so a
+            // mismatch with the other phone shows up instead of a silent
+            // "connected, but no video".
+            _uiState.update {
+                it.copy(
+                    activeRole = cfg.role,
+                    activeRobotId = cfg.robotId,
+                    activeSession = cfg.sessionCode
+                )
+            }
+            android.util.Log.d(
+                "BhoomiBotRelay",
+                "[GUI] OperatorLiveViewModel init — connecting: url='${cfg.serverUrl}' " +
+                    "role=${cfg.role} robotId='${cfg.robotId}' session='${cfg.sessionCode}'"
+            )
+            repository.connect(cfg)
         }
         // Each of these coroutines mirrors one repository flow into the single
         // UiState. `it` is the newly emitted value; `s` is the current state we
         // copy() so only that one field changes (data classes are immutable).
-        viewModelScope.launch { repository.connectionState.collect { _uiState.update { s -> s.copy(connectionState = it) } } }
-        viewModelScope.launch { repository.peerStatus.collect { _uiState.update { s -> s.copy(peerStatus = it) } } }
-        viewModelScope.launch { repository.telemetry.collect { _uiState.update { s -> s.copy(telemetry = it) } } }
+        viewModelScope.launch(exceptionHandler) { repository.connectionState.collect { _uiState.update { s -> s.copy(connectionState = it) } } }
+        viewModelScope.launch(exceptionHandler) { repository.connectionError.collect { _uiState.update { s -> s.copy(error = it) } } }
+        viewModelScope.launch(exceptionHandler) { repository.peerStatus.collect { _uiState.update { s -> s.copy(peerStatus = it) } } }
+        viewModelScope.launch(exceptionHandler) { repository.telemetry.collect { _uiState.update { s -> s.copy(telemetry = it) } } }
         // Frames arrive as raw jpeg bytes; decode each into an ImageBitmap the
-        // Compose Image() can draw. Decoding goes through the injected decoder.
-        viewModelScope.launch {
+        // Compose Image() can draw. Decoding is HEAVY (BitmapFactory), so it MUST
+        // run off the main thread — decoding on the UI thread for every frame
+        // (12–30 fps) blocks the UI and causes an ANR that looks like "the app
+        // minimized". Dispatchers.Default keeps the UI responsive and stable.
+        viewModelScope.launch(Dispatchers.Default + exceptionHandler) {
             repository.frames.collect { frame ->
-                val bmp = decoder.decode(frame.jpeg)
+                val bmp = runCatching { decoder.decode(frame.jpeg) }.getOrNull()
                 _uiState.update { s -> s.copy(frame = bmp) }
             }
         }
@@ -113,6 +149,15 @@ class OperatorLiveViewModel(
 
     fun toggleLights(on: Boolean) {
         repository.sendCommand(RobotCommand(lights = on))
+    }
+
+    // Re-establish the link after an error (or a manual retry from the UI). Clears
+    // the error message, then disconnect + reconnect with the same config.
+    fun retry() {
+        _uiState.update { it.copy(error = null) }
+        val cfg = config ?: return
+        repository.disconnect()
+        repository.connect(cfg)
     }
 
     // Called when the screen (and its ViewModel) goes away — close the socket so

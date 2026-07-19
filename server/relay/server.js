@@ -26,12 +26,37 @@ const { WebSocketServer } = require('ws');
 
 const PORT = Number(process.env.PORT) || 8080;
 
+// === TEMPORARY DEBUG LOGGING — remove before production =========================
+// Lets us see, on Render, exactly what connects and what frames flow. Delete this
+// whole block (and every dlog(...) call below) once the connection is verified.
+// ON by default while we verify the link, but can be switched off from Render's
+// environment variables (set RELAY_DEBUG=false) without a redeploy.
+const RELAY_DEBUG = (process.env.RELAY_DEBUG ?? 'true') === 'true';
+function dlog(...args) {
+  if (!RELAY_DEBUG) return;
+  console.log('[relay-debug]', new Date().toISOString(), ...args);
+}
+function clientIp(req) { return req.headers['x-forwarded-for'] || req.socket.remoteAddress; }
+function safeType(data) {
+  try { const o = JSON.parse(data.toString()); return (o && o.type) || '?'; } catch (_e) { return '?'; }
+}
+// =================================================================================
+
 const app = express();
+// Log every HTTP request (health checks, root, etc.) with caller IP + User-Agent.
+app.use((req, res, next) => {
+  dlog('[HTTP REQUEST]', req.method, req.url, 'ip=', clientIp(req), 'ua=', req.headers['user-agent']);
+  next();
+});
 app.get('/', (_req, res) => res.json({ service: 'bhoomibot-live-relay', status: 'ok' }));
 app.get('/health', (_req, res) => res.json({ ok: true, sessions: sessions.size }));
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
+// Log each WebSocket upgrade request (the moment a client asks to switch protocols).
+server.on('upgrade', (req) => {
+  dlog('[WS UPGRADE]', req.url, 'ip=', clientIp(req), 'ua=', req.headers['user-agent']);
+});
 
 /** sessionKey -> Set<ws> */
 const sessions = new Map();
@@ -66,13 +91,17 @@ function broadcastPeerStatus(set) {
   }
 }
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
   ws.id = nextId++;
   ws.meta = null;     // filled in once HELLO arrives
   ws.isAlive = true;
+  dlog('[CLIENT CONNECTED]', 'id=', ws.id, 'ip=', clientIp(req), 'ua=', req.headers['user-agent']);
   ws.on('pong', () => { ws.isAlive = true; });
 
   ws.on('message', (data, isBinary) => {
+    dlog('[CLIENT MSG]', 'role=', ws.meta && ws.meta.role, 'robotId=', ws.meta && ws.meta.robotId,
+      'sessionId=', ws.meta && ws.meta.session, 'binary=', isBinary, 'bytes=', data.length,
+      isBinary ? '' : ('type=' + safeType(data)));
     // The very first text frame must be the HELLO handshake.
     if (!ws.meta && !isBinary) {
       let hello = null;
@@ -91,9 +120,11 @@ wss.on('connection', (ws) => {
         if (!sessions.has(key)) sessions.set(key, new Set());
         sessions.get(key).add(ws);
         broadcastPeerStatus(sessions.get(key));
+        dlog('[CLIENT HELLO]', 'id=', ws.id, 'role=', role, 'robotId=', robotId, 'sessionId=', session);
         return;
       }
       // Not a valid hello: refuse the connection.
+      dlog('REJECT', 'id=', ws.id, 'reason=HELLO handshake required');
       ws.close(1008, 'HELLO handshake required');
       return;
     }
@@ -103,13 +134,14 @@ wss.on('connection', (ws) => {
     if (!set) return;
     for (const c of set) {
       if (c !== ws && c.readyState === c.OPEN) {
-        if (isBinary) c.send(data);
-        else c.send(data.toString());
+        if (isBinary) { c.send(data); dlog('SEND', 'from=', ws.id, 'to=', c.id, 'binary=true', 'bytes=', data.length); }
+        else { c.send(data.toString()); dlog('SEND', 'from=', ws.id, 'to=', c.id, 'binary=false', 'bytes=', data.toString().length); }
       }
     }
   });
 
-  ws.on('close', () => {
+  ws.on('close', (code, reason) => {
+    dlog('[CLIENT DISCONNECTED]', 'id=', ws.id, 'code=', code, 'reason=', reason && reason.toString());
     if (ws.meta && sessions.has(ws.meta.key)) {
       const set = sessions.get(ws.meta.key);
       set.delete(ws);
@@ -118,7 +150,7 @@ wss.on('connection', (ws) => {
     }
   });
 
-  ws.on('error', () => { /* ignore; 'close' handles cleanup */ });
+  ws.on('error', (err) => { dlog('ERROR', 'id=', ws.id, 'msg=', err && err.message); });
 });
 
 // Heartbeat: drop sockets that stop answering pings (covers dead mobile links).

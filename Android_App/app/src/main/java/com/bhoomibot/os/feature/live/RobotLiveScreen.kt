@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
@@ -70,7 +71,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.widget.Toast
 import com.bhoomibot.os.connection.model.VideoQuality
+import com.bhoomibot.os.connection.transport.LiveConnectionState
 import com.bhoomibot.os.ui.theme.SafetyRed
 import com.bhoomibot.os.ui.theme.SignalGreen
 import kotlinx.coroutines.flow.first
@@ -91,6 +94,21 @@ fun RobotLiveScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    // Surface connection-state changes as on-screen Toasts (no terminal needed).
+    LaunchedEffect(state.connectionState) {
+        val msg = when (state.connectionState) {
+            LiveConnectionState.CONNECTED -> "ROBOT: Connected to relay (Live)"
+            LiveConnectionState.CONNECTING -> "ROBOT: Connecting to relay…"
+            LiveConnectionState.RECONNECTING -> "ROBOT: Connection lost — reconnecting…"
+            LiveConnectionState.ERROR -> "ROBOT: Connection failed (Offline)"
+            LiveConnectionState.IDLE -> "ROBOT: Idle"
+        }
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+    }
+    // Surface the exact WebSocket failure reason (the missing piece for debugging).
+    LaunchedEffect(state.error) {
+        state.error?.let { Toast.makeText(context, "ROBOT error: $it", Toast.LENGTH_LONG).show() }
+    }
     // Track camera permission in Compose state so the UI switches between the
     // preview and the "grant permission" prompt. Seeded with the current grant.
     var hasPermission by remember {
@@ -146,11 +164,40 @@ fun RobotLiveScreen(
             IconButton(onClick = onOpenOptions) { Icon(Icons.Default.Settings, "Options", tint = Color.White) }
         }
 
+        // Error banner: if the link failed or an unexpected error occurred, show
+        // it with a Retry button instead of leaving the user on a dead screen.
+        if (state.error != null || state.connectionState == LiveConnectionState.ERROR) {
+            Column(
+                Modifier.align(Alignment.TopCenter)
+                    .padding(top = 64.dp, start = 12.dp, end = 12.dp)
+                    .background(SafetyRed.copy(alpha = 0.92f), RoundedCornerShape(12.dp))
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    state.error ?: "Connection failed. Check the relay URL, Robot ID and session code, then retry.",
+                    color = Color.White, style = MaterialTheme.typography.labelMedium
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = viewModel::retry,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = SafetyRed)
+                ) { Text("Retry", fontWeight = FontWeight.Bold) }
+            }
+        }
+
         // Bottom: peer presence + start/stop + counters.
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Diagnostic: this phone's role + Robot ID + session so a role/key
+            // mismatch (the usual "connected but no video" cause) is visible.
+            SessionInfoChip(
+                state.activeRole, state.activeRobotId, state.activeSession,
+                Modifier.background(Color.Black.copy(alpha = 0.4f)).padding(8.dp)
+            )
+            Spacer(Modifier.height(8.dp))
             PeerRow(
                 state.peerStatus,
                 Modifier.background(Color.Black.copy(alpha = 0.4f)).padding(8.dp)

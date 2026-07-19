@@ -44,8 +44,13 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
+import android.util.Log
+import java.net.URI
 import java.util.concurrent.TimeUnit
 import kotlin.math.min
+
+/** Tag for all relay [Log] lines so they're easy to filter in logcat. */
+private const val TAG = "BhoomiBotRelay"
 
 /**
  * OkHttp-backed [LiveLinkClient]. Opens one WebSocket to the relay, sends the HELLO
@@ -68,9 +73,17 @@ class WebSocketLiveLinkClient(
     // the OkHttp callback thread (tryEmit drops rather than suspends).
     private val _messages = MutableSharedFlow<LiveEnvelope>(extraBufferCapacity = 128)
     private val _frames = MutableSharedFlow<LiveFrame>(extraBufferCapacity = 64)
+    private val _lastError = MutableStateFlow<String?>(null)
 
     private val client = OkHttpClient.Builder()
         .pingInterval(15, TimeUnit.SECONDS) // keepalive through mobile NATs
+        // Render's free tier spins the service down after inactivity, so the first
+        // WebSocket handshake after a cold start can take 30-60s. OkHttp's 10s
+        // default connect/read timeout would abort that handshake and surface a
+        // spurious ERROR/RECONNECTING on first connect. 30s lets attempt #1 ride
+        // out the wake-up; autoReconnect covers anything longer.
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
     @Volatile private var webSocket: WebSocket? = null
@@ -79,12 +92,14 @@ class WebSocketLiveLinkClient(
     override val messages: Flow<LiveEnvelope> = _messages.asSharedFlow()
     override val frames: Flow<LiveFrame> = _frames.asSharedFlow()
     override val connectionState: StateFlow<LiveConnectionState> = _state.asStateFlow()
+    override val lastError: StateFlow<String?> = _lastError.asStateFlow()
 
     // Re-point at a new config (server/robotId/session). Takes effect on the next
     // openOnce() call; the repository calls this just before connect().
     override fun updateConfig(next: ConnectionConfig) { config = next }
 
     override fun connect() {
+        Log.d(TAG, "[RELAY] connect() called — loop already active? ${loopJob?.isActive == true}")
         // Guard against double-connect: if the loop is already running, do nothing.
         if (loopJob?.isActive == true) return
         loopJob = scope.launch { connectionLoop() }
@@ -145,10 +160,18 @@ class WebSocketLiveLinkClient(
     private suspend fun openOnce(): Boolean {
         val opened = CompletableDeferred<Boolean>()
         val closed = CompletableDeferred<Unit>()
-        val url = config.serverUrl.trim()
+        // Accept a user-facing http(s):// relay address too: normalize to ws(s)://
+        // so a relay pasted as its https site URL still opens a valid WebSocket.
+        // This makes the transport resilient even if a caller forgot to normalize.
+        val rawUrl = config.serverUrl.trim()
+        val url = normalizeToWebSocketUrl(rawUrl)
+        val parsed = runCatching { URI(url) }.getOrNull()
+        Log.d(TAG, "[RELAY] Attempting relay connection")
+        Log.d(TAG, "[RELAY] final URL=$url (raw='$rawUrl') protocol=${parsed?.scheme} host=${parsed?.host} path=${parsed?.path ?: "/"}")
         // Validate the scheme up front. A bad URL is a terminal config error, not
         // something retrying will fix, so go straight to ERROR and bail.
         if (!url.startsWith("ws://") && !url.startsWith("wss://")) {
+            Log.e(TAG, "[RELAY] ERROR: URL scheme is not ws(s):// — cannot open WebSocket: '$url'")
             _state.value = LiveConnectionState.ERROR
             return false
         }
@@ -156,11 +179,15 @@ class WebSocketLiveLinkClient(
             Request.Builder().url(url).build()
         } catch (_: IllegalArgumentException) {
             // Malformed URL that passed the prefix check (e.g. "ws://").
+            Log.e(TAG, "[RELAY] ERROR: malformed URL: '$url'")
             _state.value = LiveConnectionState.ERROR
             return false
         }
+        Log.d(TAG, "[RELAY] Opening WebSocket — headers=${request.headers}")
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
+                Log.d(TAG, "[RELAY] CONNECTED url=$url")
+                _lastError.value = null
                 sendHello() // announce role + session so the relay can pair us
                 _state.value = LiveConnectionState.CONNECTED
                 opened.complete(true)
@@ -181,18 +208,23 @@ class WebSocketLiveLinkClient(
 
             // Peer began a graceful close: acknowledge it to complete the handshake.
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                Log.d(TAG, "[RELAY] CLOSING code=$code reason='$reason'")
                 webSocket.close(1000, null)
             }
 
             // Socket fully closed. Unblock both deferreds (guarding against having
             // already completed them) so openOnce() returns and the loop proceeds.
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                Log.d(TAG, "[RELAY] CLOSED code=$code reason='$reason'")
                 if (!opened.isCompleted) opened.complete(false)
                 if (!closed.isCompleted) closed.complete(Unit)
             }
 
             // Network/protocol error: treat exactly like a close so backoff kicks in.
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                val reason = t.message ?: "unknown error"
+                Log.e(TAG, "[RELAY] ERROR url=$url msg=$reason responseCode=${response?.code}", t)
+                _lastError.value = "WS failed: $reason${if (response != null) " (HTTP ${response.code})" else ""}"
                 if (!opened.isCompleted) opened.complete(false)
                 if (!closed.isCompleted) closed.complete(Unit)
             }
@@ -233,5 +265,21 @@ class WebSocketLiveLinkClient(
     // semantics as send(): a frame lost during a drop is fine, the next one follows.
     override fun sendFrame(jpeg: ByteArray) {
         runCatching { webSocket?.send(ByteString.of(*jpeg)) }
+    }
+}
+
+/**
+ * Converts a user-typed relay address into one OkHttp can open. A pasted https://
+ * site URL becomes wss://; http:// becomes ws://. Already-correct ws(s):// stays put.
+ * Mirrors the UI's [com.bhoomibot.os.feature.connection.ConnectionOptionsUiState] normalization
+ * so the transport never silently rejects a valid relay just because it was given https://.
+ */
+private fun normalizeToWebSocketUrl(url: String): String {
+    val trimmed = url.trim()
+    val lower = trimmed.lowercase()
+    return when {
+        lower.startsWith("https://") -> "wss://" + trimmed.substring("https://".length)
+        lower.startsWith("http://") -> "ws://" + trimmed.substring("http://".length)
+        else -> trimmed
     }
 }

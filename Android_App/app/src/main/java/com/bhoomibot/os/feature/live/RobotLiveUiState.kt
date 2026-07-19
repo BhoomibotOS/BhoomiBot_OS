@@ -4,6 +4,7 @@ import com.bhoomibot.os.connection.model.PeerStatus
 import com.bhoomibot.os.connection.model.RobotCommand
 import com.bhoomibot.os.connection.model.VideoQuality
 import com.bhoomibot.os.connection.transport.LiveConnectionState
+import com.bhoomibot.os.model.DeviceRole
 
 /**
  * Immutable snapshot of everything RobotLiveScreen needs to render.
@@ -24,5 +25,11 @@ data class RobotLiveUiState(
     val videoFps: Int = 12,
     val videoQuality: VideoQuality = VideoQuality.MEDIUM,
     val networkLabel: String = "Checking network…",                     // human-readable link type, e.g. "Wi-Fi"
-    val isConstrainedNetwork: Boolean = false                           // true = metered/cellular -> data saver on
+    val isConstrainedNetwork: Boolean = false,                          // true = metered/cellular -> data saver on
+    // Diagnostic: the role + meet-keys this phone is actually using, so a
+    // role/key mismatch (the usual "connected but no video" cause) is visible
+    // on screen instead of being invisible.
+    val activeRole: DeviceRole? = null,
+    val activeRobotId: String = "",
+    val activeSession: String = ""
 )

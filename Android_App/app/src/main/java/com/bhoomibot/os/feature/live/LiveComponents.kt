@@ -39,6 +39,7 @@ import com.bhoomibot.os.connection.model.PeerStatus
 import com.bhoomibot.os.connection.model.TelemetrySnapshot
 import com.bhoomibot.os.connection.transport.LiveConnectionState
 import com.bhoomibot.os.model.DriveCommand
+import com.bhoomibot.os.model.DeviceRole
 import com.bhoomibot.os.ui.theme.MutedText
 import com.bhoomibot.os.ui.theme.SafetyRed
 import com.bhoomibot.os.ui.theme.SignalGreen
@@ -91,6 +92,34 @@ fun PeerRow(peer: PeerStatus, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         PeerDot("Robot", peer.robotOnline)
         PeerDot("Operator", peer.operatorOnline)
+    }
+}
+
+/**
+ * Diagnostic pill showing THIS phone's active role + meet-keys (Robot ID +
+ * session code). When two phones fail to exchange video despite both showing
+ * "Connected", the cause is almost always a role or key mismatch — this makes
+ * it visible at a glance so the user can confirm both phones agree.
+ */
+@Composable
+fun SessionInfoChip(
+    role: DeviceRole?,
+    robotId: String,
+    session: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(999.dp),
+        color = Color.Black.copy(alpha = 0.45f)
+    ) {
+        Text(
+            "${role?.name ?: "?"} · $robotId · $session",
+            color = Color.White,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+        )
     }
 }
 

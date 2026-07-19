@@ -28,6 +28,7 @@ import com.bhoomibot.os.connection.provideLiveLinkRepository
 import com.bhoomibot.os.data.LiveLinkPreferencesStore
 import com.bhoomibot.os.model.DeviceRole
 import com.bhoomibot.os.model.MockRobotData
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -72,8 +73,14 @@ class RobotLiveViewModel(application: Application) : AndroidViewModel(applicatio
         override fun onLost(network: Network) = updateNetworkProfile()
     }
 
+    // Any unexpected exception in the coroutines below is caught here and shown as
+    // an error message instead of crashing the app.
+    private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        _uiState.update { it.copy(error = throwable.message ?: "Unexpected error during live link") }
+    }
+
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             val prefs = LiveLinkPreferencesStore.preferences(application).first()
             config = ConnectionConfig(
                 serverUrl = prefs.serverUrl,
@@ -90,12 +97,27 @@ class RobotLiveViewModel(application: Application) : AndroidViewModel(applicatio
             // Compute the initial network profile now that we have the baseline
             // settings; this also flips isConfigurationReady true.
             updateNetworkProfile()
+            // Surface the role + meet-keys this phone is actually using, so a
+            // mismatch with the other phone shows up instead of a silent
+            // "connected, but no video".
+            _uiState.update {
+                it.copy(
+                    activeRole = DeviceRole.ROBOT,
+                    activeRobotId = config!!.robotId,
+                    activeSession = config!!.sessionCode
+                )
+            }
+            // Open the socket as soon as settings load (mirrors the operator VM), so
+            // "both connected" no longer waits on a manual Start Broadcast tap. The
+            // camera + telemetry still only flow once startBroadcast() runs.
+            repository.connect(config!!)
         }
         // Mirror repository flows into UiState (same pattern as the operator VM).
-        viewModelScope.launch { repository.connectionState.collect { _uiState.update { s -> s.copy(connectionState = it) } } }
-        viewModelScope.launch { repository.peerStatus.collect { _uiState.update { s -> s.copy(peerStatus = it) } } }
+        viewModelScope.launch(exceptionHandler) { repository.connectionState.collect { _uiState.update { s -> s.copy(connectionState = it) } } }
+        viewModelScope.launch(exceptionHandler) { repository.connectionError.collect { _uiState.update { s -> s.copy(error = it) } } }
+        viewModelScope.launch(exceptionHandler) { repository.peerStatus.collect { _uiState.update { s -> s.copy(peerStatus = it) } } }
         // Inbound commands from the operator (the robot would forward these to the VCU).
-        viewModelScope.launch { repository.incomingCommands.collect { _uiState.update { s -> s.copy(lastCommand = it) } } }
+        viewModelScope.launch(exceptionHandler) { repository.incomingCommands.collect { _uiState.update { s -> s.copy(lastCommand = it) } } }
         connectivityManager.registerDefaultNetworkCallback(networkCallback)
     }
 
@@ -103,7 +125,16 @@ class RobotLiveViewModel(application: Application) : AndroidViewModel(applicatio
     // broadcasting, and begin the telemetry heartbeat. Frames start flowing once
     // the screen's CameraX pipeline binds (it keys off isBroadcasting).
     fun startBroadcast() {
-        val cfg = config ?: return
+        val cfg = config
+        if (cfg == null) {
+            android.util.Log.e("BhoomiBotRelay", "[GUI] RobotLiveViewModel.startBroadcast() — config is null, not connecting")
+            return
+        }
+        android.util.Log.d(
+            "BhoomiBotRelay",
+            "[GUI] RobotLiveViewModel.startBroadcast() — connecting: url='${cfg.serverUrl}' " +
+                "role=${cfg.role} robotId='${cfg.robotId}' session='${cfg.sessionCode}'"
+        )
         repository.connect(cfg)
         _uiState.update { it.copy(isBroadcasting = true) }
         startTelemetry()
@@ -116,6 +147,18 @@ class RobotLiveViewModel(application: Application) : AndroidViewModel(applicatio
         telemetryJob = null
         repository.disconnect()
         _uiState.update { it.copy(isBroadcasting = false, lastCommand = null) }
+    }
+
+    // Re-establish the link after an error (or a manual retry from the UI).
+    fun retry() {
+        _uiState.update { it.copy(error = null) }
+        val cfg = config ?: return
+        repository.disconnect()
+        if (_uiState.value.isBroadcasting) {
+            startBroadcast()
+        } else {
+            repository.connect(cfg)
+        }
     }
 
     /** Called by the CameraX analyzer with each compressed jpeg frame. */
