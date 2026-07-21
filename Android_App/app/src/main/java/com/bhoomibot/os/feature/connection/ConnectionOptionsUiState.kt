@@ -20,7 +20,9 @@ data class ConnectionOptionsUiState(
     val networkMode: PhoneNetworkMode = PhoneNetworkMode.INTERNET,
     val videoFps: Int = 12,
     val videoQuality: VideoQuality = VideoQuality.MEDIUM,
-    val saved: Boolean = false
+    val saved: Boolean = false,
+    /** Recently used server URLs, most-recent-first, for quick selection. */
+    val recentServerUrls: List<String> = emptyList()
 ) {
     /**
      * The URL actually used to connect: [serverUrl] with its scheme normalized

@@ -24,17 +24,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -89,7 +93,20 @@ fun OperatorLiveScreen(
         // already decoded into an ImageBitmap by the ViewModel; null until the
         // first frame arrives from the robot.
         val frame = state.frame
-        if (frame != null) {
+        if (!state.liveCameraEnabled) {
+            // The operator switched the robot's camera off remotely: the robot has
+            // stopped broadcasting, so there's nothing to show until it's turned on.
+            Column(
+                Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(Icons.Default.Videocam, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(40.dp))
+                Spacer(Modifier.height(12.dp))
+                Text("Live camera is off", color = Color.White, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+                Text("Turn it on to watch the robot's feed.", color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall)
+            }
+        } else if (frame != null) {
             Image(
                 bitmap = frame,
                 contentDescription = "Live robot feed",
@@ -161,14 +178,21 @@ fun OperatorLiveScreen(
                 .padding(8.dp)
         )
 
-        // Drive controls (bottom-center). Method references hand each button press
-        // straight to the ViewModel, which packages it as a RobotCommand and sends
-        // it back to the robot over the live link.
-        DriveControls(
-            onDrive = viewModel::sendDrive,
-            onEmergencyStop = viewModel::sendEmergencyStop,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)
-        )
+        // Live camera switch (bottom-center): remotely starts/stops the robot's
+        // broadcast over the relay. The link stays connected; only the stream toggles.
+        Surface(
+            Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+            shape = RoundedCornerShape(14.dp),
+            color = Color.Black.copy(alpha = 0.5f)
+        ) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Videocam, null, tint = Color.White)
+                Spacer(Modifier.width(8.dp))
+                Text("Live camera", color = Color.White, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(12.dp))
+                Switch(checked = state.liveCameraEnabled, onCheckedChange = viewModel::setLiveCameraEnabled)
+            }
+        }
 
         // Diagnostic: this phone's role + Robot ID + session so a role/key
         // mismatch (the usual "connected but no video" cause) is visible.

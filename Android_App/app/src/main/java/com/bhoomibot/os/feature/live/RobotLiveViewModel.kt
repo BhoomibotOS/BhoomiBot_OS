@@ -25,6 +25,7 @@ import com.bhoomibot.os.connection.model.VideoQuality
 import com.bhoomibot.os.connection.model.toTelemetry
 import com.bhoomibot.os.connection.repository.LiveLinkRepository
 import com.bhoomibot.os.connection.provideLiveLinkRepository
+import com.bhoomibot.os.connection.transport.LiveConnectionState
 import com.bhoomibot.os.data.LiveLinkPreferencesStore
 import com.bhoomibot.os.model.DeviceRole
 import com.bhoomibot.os.model.MockRobotData
@@ -117,13 +118,26 @@ class RobotLiveViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch(exceptionHandler) { repository.connectionError.collect { _uiState.update { s -> s.copy(error = it) } } }
         viewModelScope.launch(exceptionHandler) { repository.peerStatus.collect { _uiState.update { s -> s.copy(peerStatus = it) } } }
         // Inbound commands from the operator (the robot would forward these to the VCU).
-        viewModelScope.launch(exceptionHandler) { repository.incomingCommands.collect { _uiState.update { s -> s.copy(lastCommand = it) } } }
+        viewModelScope.launch(exceptionHandler) { repository.incomingCommands.collect { cmd ->
+            // A non-null liveCamera field is the operator's remote "live camera"
+            // switch: true -> start broadcasting, false -> stop. Stopping keeps the
+            // relay connection alive; only the frame/telemetry stream halts.
+            if (cmd.liveCamera != null) {
+                if (cmd.liveCamera == true) startBroadcast() else stopBroadcast()
+            }
+            // Pure broadcast toggles carry no drive intent, so don't surface them as
+            // the "last command" the operator sent.
+            if (cmd.liveCamera == null) {
+                _uiState.update { s -> s.copy(lastCommand = cmd) }
+            }
+        } }
         connectivityManager.registerDefaultNetworkCallback(networkCallback)
     }
 
-    // START: bail if settings haven't loaded yet, otherwise open the link, mark
-    // broadcasting, and begin the telemetry heartbeat. Frames start flowing once
-    // the screen's CameraX pipeline binds (it keys off isBroadcasting).
+    // START: bail if settings haven't loaded yet, otherwise make sure the link is
+    // up (only reconnecting if it isn't already), mark broadcasting, and begin the
+    // telemetry heartbeat. Frames start flowing once the screen's CameraX pipeline
+    // binds (it keys off isBroadcasting).
     fun startBroadcast() {
         val cfg = config
         if (cfg == null) {
@@ -135,17 +149,23 @@ class RobotLiveViewModel(application: Application) : AndroidViewModel(applicatio
             "[GUI] RobotLiveViewModel.startBroadcast() — connecting: url='${cfg.serverUrl}' " +
                 "role=${cfg.role} robotId='${cfg.robotId}' session='${cfg.sessionCode}'"
         )
-        repository.connect(cfg)
+        // Connect only if we're not already connected — the link is opened once in
+        // init and must stay alive across start/stop broadcasts. Reconnecting here
+        // would briefly drop the operator's session.
+        if (_uiState.value.connectionState != LiveConnectionState.CONNECTED) {
+            repository.connect(cfg)
+        }
         _uiState.update { it.copy(isBroadcasting = true) }
         startTelemetry()
     }
 
-    // STOP: end the telemetry loop, close the link, and clear broadcast state.
-    // lastCommand is cleared so a stale operator command isn't shown next time.
+    // STOP: end the telemetry loop and stop the camera/telemetry stream, but KEEP
+    // the relay connection alive (the operator's "live camera" switch expects the
+    // link to persist — only the broadcast stops). lastCommand is cleared so a
+    // stale operator command isn't shown next time.
     fun stopBroadcast() {
         telemetryJob?.cancel()
         telemetryJob = null
-        repository.disconnect()
         _uiState.update { it.copy(isBroadcasting = false, lastCommand = null) }
     }
 

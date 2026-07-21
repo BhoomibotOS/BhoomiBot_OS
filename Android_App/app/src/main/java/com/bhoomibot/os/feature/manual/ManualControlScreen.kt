@@ -9,6 +9,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -74,11 +75,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bhoomibot.os.model.DriveCommand
-import com.bhoomibot.os.feature.camera.BackCameraPreview
+import com.bhoomibot.os.connection.transport.LiveConnectionState
+import com.bhoomibot.os.feature.live.OperatorLiveViewModel
 import com.bhoomibot.os.ui.theme.MutedText
 import com.bhoomibot.os.ui.theme.SafetyRed
 import com.bhoomibot.os.ui.theme.SignalGreen
@@ -105,9 +109,19 @@ import kotlin.math.roundToInt
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ManualControlScreen(onBackClick: () -> Unit, viewModel: ManualViewModel = viewModel()) {
+fun ManualControlScreen(onBackClick: () -> Unit, viewModel: ManualViewModel = viewModel(), liveViewModel: OperatorLiveViewModel = viewModel()) {
     // Subscribe to the ViewModel's state; recomposes whenever the state changes.
     val state by viewModel.uiState.collectAsState()
+    // The live-link (internet relay) feed: connects as OPERATOR and decodes the
+    // robot's video frames. We reuse OperatorLiveViewModel so the manual screen
+    // can show the remote feed in place of the local CameraX preview.
+    val liveState by liveViewModel.uiState.collectAsState()
+    // Flipping "Live camera" both shows/hides the feed locally AND remotely
+    // tells the robot to start/stop broadcasting (the link stays connected).
+    val onLiveCameraToggle: (Boolean) -> Unit = { enabled ->
+        viewModel.setCameraEnabled(enabled)
+        liveViewModel.sendLiveCamera(enabled)
+    }
     Box(Modifier.fillMaxSize()) {
     Scaffold(
         // Top app bar: center title (status strip) + back arrow to return to the dashboard.
@@ -120,9 +134,11 @@ fun ManualControlScreen(onBackClick: () -> Unit, viewModel: ManualViewModel = vi
             if (!state.isCameraMaximized) {
                 LiveCameraPreview(
                     onMaximize = { viewModel.setCameraMaximized(true) },
-                    torchEnabled = state.cameraLightEnabled,
                     cameraEnabled = state.cameraEnabled,
-                    onCameraToggle = { viewModel.setCameraEnabled(!state.cameraEnabled) }
+                    onCameraToggle = { onLiveCameraToggle(!state.cameraEnabled) },
+                    liveFrame = liveState.frame,
+                    connectionState = liveState.connectionState,
+                    onRetry = liveViewModel::retry
                 )
             }
             Spacer(Modifier.height(12.dp))
@@ -152,7 +168,22 @@ fun ManualControlScreen(onBackClick: () -> Unit, viewModel: ManualViewModel = vi
     }
         // When the camera is opened full-screen, draw the landscape overlay on top of everything.
         if (state.isCameraMaximized) {
-            MaximizedCameraOverlay(state.drivingMode, state.vehicleSpeedPercent, state.cameraLightEnabled, state.cameraEnabled, { viewModel.setCameraEnabled(!state.cameraEnabled) }, viewModel::onJoystickChanged, viewModel::onForward, viewModel::onReverse, viewModel::onLeft, viewModel::onRight, viewModel::onStop, onDismiss = { viewModel.setCameraMaximized(false) })
+            MaximizedCameraOverlay(
+                mode = state.drivingMode,
+                speedMetersPerSecond = state.vehicleSpeedPercent,
+                cameraEnabled = state.cameraEnabled,
+                onCameraToggle = { onLiveCameraToggle(!state.cameraEnabled) },
+                onJoystickChanged = viewModel::onJoystickChanged,
+                onForward = viewModel::onForward,
+                onReverse = viewModel::onReverse,
+                onLeft = viewModel::onLeft,
+                onRight = viewModel::onRight,
+                onStop = viewModel::onStop,
+                onDismiss = { viewModel.setCameraMaximized(false) },
+                liveFrame = liveState.frame,
+                connectionState = liveState.connectionState,
+                onRetry = liveViewModel::retry
+            )
         }
     }
 }
@@ -170,14 +201,25 @@ fun ManualControlScreen(onBackClick: () -> Unit, viewModel: ManualViewModel = vi
 @Composable private fun TopStatus(label: String, value: String, color: Color, modifier: Modifier) = Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) { Text(label, color = MutedText, style = MaterialTheme.typography.labelSmall); Text(value, color = color, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, maxLines = 1) }
 
 // Normal (non-full-screen) camera card. Tapping the card opens full-screen; the "Live camera"
-// switch turns the feed ON/OFF. Shows "CAMERA OFF" when disabled.
+// switch turns the feed ON/OFF. Shows the robot's remote live feed (internet relay) when the
+// link is healthy, a "check your connection" hint while it isn't, and "CAMERA OFF" when disabled.
 /** Normal field preview. Previous height was 250dp; restore it if 360dp is unsuitable. */
-@Composable private fun LiveCameraPreview(onMaximize: () -> Unit, torchEnabled: Boolean, cameraEnabled: Boolean, onCameraToggle: () -> Unit) = Card(onClick = onMaximize, modifier = Modifier.fillMaxWidth().height(360.dp), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF101B22))) {
+@Composable private fun LiveCameraPreview(onMaximize: () -> Unit, cameraEnabled: Boolean, onCameraToggle: () -> Unit, liveFrame: ImageBitmap?, connectionState: LiveConnectionState, onRetry: () -> Unit) = Card(onClick = onMaximize, modifier = Modifier.fillMaxWidth().height(360.dp), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF101B22))) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         if (cameraEnabled) {
-            // Live feed + a green "FULL SCREEN" button (bottom-right) to expand the view.
-            BackCameraPreview(Modifier.fillMaxSize(), torchEnabled)
-            Button(onMaximize, modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = SignalGreen, contentColor = Color(0xFF062112))) { Text("FULL SCREEN", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelSmall) }
+            // When the relay link is healthy and a frame has arrived, show the robot's remote
+            // feed IN PLACE OF the local CameraX preview. Otherwise ask the user to check the link.
+            if (liveFrame != null) {
+                Image(
+                    bitmap = liveFrame,
+                    contentDescription = "Live robot feed",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                Button(onMaximize, modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = SignalGreen, contentColor = Color(0xFF062112))) { Text("FULL SCREEN", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelSmall) }
+            } else {
+                LiveConnectionHint(connectionState, Modifier.align(Alignment.Center), onRetry)
+            }
         } else {
             // Camera disabled: just show a label.
             Text("CAMERA OFF", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -188,7 +230,26 @@ fun ManualControlScreen(onBackClick: () -> Unit, viewModel: ManualViewModel = vi
             Spacer(Modifier.width(10.dp))
             Switch(cameraEnabled, onCheckedChange = { onCameraToggle() })
         }
-        Text("CameraX preview ready", modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp), color = MutedText, style = MaterialTheme.typography.labelSmall)
+        Text(if (liveFrame != null) "Live relay feed" else "Waiting for connection…", modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp), color = MutedText, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+// Shown in the camera slot when "Live camera" is ON but the relay link isn't yet delivering
+// frames. Guides the operator to check their connection based on the current socket state.
+@Composable private fun LiveConnectionHint(state: LiveConnectionState, modifier: Modifier = Modifier, onRetry: () -> Unit) = Column(modifier.padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    val (title, detail) = when (state) {
+        LiveConnectionState.ERROR -> "Check your connection" to "Couldn't reach the relay. Verify the relay URL, Robot ID and session code in Live Link settings, then retry."
+        LiveConnectionState.RECONNECTING -> "Reconnecting…" to "The link dropped — trying to re-establish the connection."
+        LiveConnectionState.CONNECTING -> "Connecting…" to "Connecting to the relay. Make sure the robot is broadcasting."
+        LiveConnectionState.CONNECTED -> "Waiting for feed…" to "Connected, but no video yet. Confirm the robot is live and the keys match."
+        LiveConnectionState.IDLE -> "Not connected" to "No live feed yet. Check the Live Link settings and your connection."
+    }
+    Text(title, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(8.dp))
+    Text(detail, color = MutedText, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
+    if (state == LiveConnectionState.ERROR) {
+        Spacer(Modifier.height(14.dp))
+        Button(onClick = onRetry, colors = ButtonDefaults.buttonColors(containerColor = SignalGreen, contentColor = Color(0xFF062112))) { Text("Retry", fontWeight = FontWeight.Bold) }
     }
 }
 
@@ -198,7 +259,7 @@ fun ManualControlScreen(onBackClick: () -> Unit, viewModel: ManualViewModel = vi
 // Full-screen landscape camera overlay. Forced to landscape while shown; restores previous
 // orientation on close. Hosts the camera feed, "Live camera" switch, current speed, an
 // EXIT VIEW button, and drive controls (joystick or buttons) over the video.
-@Composable private fun MaximizedCameraOverlay(mode: DrivingMode, speedMetersPerSecond: Int, torchEnabled: Boolean, cameraEnabled: Boolean, onCameraToggle: () -> Unit, onJoystickChanged: (Float, DriveCommand) -> Unit, onForward: () -> Unit, onReverse: () -> Unit, onLeft: () -> Unit, onRight: () -> Unit, onStop: () -> Unit, onDismiss: () -> Unit) {
+@Composable private fun MaximizedCameraOverlay(mode: DrivingMode, speedMetersPerSecond: Int, cameraEnabled: Boolean, onCameraToggle: () -> Unit, onJoystickChanged: (Float, DriveCommand) -> Unit, onForward: () -> Unit, onReverse: () -> Unit, onLeft: () -> Unit, onRight: () -> Unit, onStop: () -> Unit, onDismiss: () -> Unit, liveFrame: ImageBitmap?, connectionState: LiveConnectionState, onRetry: () -> Unit) {
     // Force the screen to landscape for a proper wide camera view.
     val activity = LocalContext.current.findActivity()
     DisposableEffect(activity) {
@@ -208,9 +269,14 @@ fun ManualControlScreen(onBackClick: () -> Unit, viewModel: ManualViewModel = vi
     }
     Surface(Modifier.fillMaxSize(), color = Color(0xFF071117)) {
         Box(Modifier.fillMaxSize()) {
-            // Live feed or "CAMERA OFF" label depending on the switch.
-            if (cameraEnabled) BackCameraPreview(Modifier.fillMaxSize(), torchEnabled)
-            else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("CAMERA OFF", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold) }
+            // Live feed (remote relay) when healthy, a "check connection" hint while not, else "CAMERA OFF".
+            if (cameraEnabled && liveFrame != null) {
+                Image(bitmap = liveFrame, contentDescription = "Live robot feed", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else if (cameraEnabled) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LiveConnectionHint(connectionState, Modifier, onRetry) }
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("CAMERA OFF", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold) }
+            }
             // Top-left: "Live camera" label + ON/OFF switch.
             Row(Modifier.align(Alignment.TopStart).padding(24.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Live camera", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)

@@ -43,12 +43,16 @@ class ConnectionOptionsViewModel(application: Application) : AndroidViewModel(ap
                     .getOrDefault(PhoneNetworkMode.INTERNET),
                 videoFps = prefs.videoFps,
                 videoQuality = runCatching { VideoQuality.valueOf(prefs.videoQuality) }
-                    .getOrDefault(VideoQuality.MEDIUM)
+                    .getOrDefault(VideoQuality.MEDIUM),
+                recentServerUrls = prefs.recentServerUrls
             )
         }
     }
 
     fun setServerUrl(v: String) { _uiState.value = _uiState.value.copy(serverUrl = v.trim()) }
+
+    /** Pick a previously used server URL (from the history chips). */
+    fun selectRecentServerUrl(url: String) { setServerUrl(url) }
     fun setRobotId(v: String) { _uiState.value = _uiState.value.copy(robotId = v.trim()) }
     fun setSessionCode(v: String) { _uiState.value = _uiState.value.copy(sessionCode = v.trim()) }
     fun setAutoReconnect(v: Boolean) { _uiState.value = _uiState.value.copy(autoReconnect = v) }
@@ -74,7 +78,11 @@ class ConnectionOptionsViewModel(application: Application) : AndroidViewModel(ap
                     videoQuality = s.videoQuality.name
                 )
             )
-            _uiState.value = s.copy(saved = true)
+            // Remember this URL for quick re-selection next time (most-recent-first).
+            LiveLinkPreferencesStore.addRecentServerUrl(getApplication(), s.normalizedServerUrl)
+            val recents = (listOf(s.normalizedServerUrl) +
+                s.recentServerUrls.filter { it != s.normalizedServerUrl }).take(5)
+            _uiState.value = s.copy(saved = true, recentServerUrls = recents)
             android.util.Log.d(
                 "BhoomiBotRelay",
                 "[GUI] save() persisted serverUrl='${s.normalizedServerUrl}' robotId='${s.robotId}' " +

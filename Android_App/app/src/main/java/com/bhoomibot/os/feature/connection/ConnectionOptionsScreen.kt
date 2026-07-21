@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -29,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -146,6 +148,25 @@ fun ConnectionOptionsScreen(
                         supportingText = state.serverUrlError?.let { error -> { Text(error) } },
                         modifier = Modifier.fillMaxWidth()
                     )
+                    // Quick-pick previously used relay URLs so the user doesn't
+                    // have to retype the Render URL every time.
+                    if (state.recentServerUrls.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Recent", color = MutedText, style = MaterialTheme.typography.labelSmall)
+                        Spacer(Modifier.height(6.dp))
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            state.recentServerUrls.forEach { url ->
+                                SuggestionChip(
+                                    onClick = { viewModel.selectRecentServerUrl(url) },
+                                    label = { Text(url, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(12.dp))

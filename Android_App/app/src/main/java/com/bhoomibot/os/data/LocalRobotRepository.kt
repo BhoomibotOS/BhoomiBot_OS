@@ -26,4 +26,8 @@ class LocalRobotRepository : RobotRepository {
     override fun setPto(enabled: Boolean) = Unit
     // No-op: would turn the work lights on/off.
     override fun setLights(enabled: Boolean) = Unit
+    // No-op: would set the hydraulic lift height.
+    override fun setHydraulic(heightPercent: Int) = Unit
+    // No-op: would pulse the horn.
+    override fun horn() = Unit
 }

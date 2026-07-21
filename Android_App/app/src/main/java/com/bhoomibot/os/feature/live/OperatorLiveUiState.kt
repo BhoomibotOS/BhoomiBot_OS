@@ -18,6 +18,9 @@ data class OperatorLiveUiState(
     val telemetry: TelemetrySnapshot = TelemetrySnapshot(),             // latest robot read-out -> TelemetryOverlay
     val frame: ImageBitmap? = null,                                      // decoded live video frame; null = waiting
     val error: String? = null,                                          // set if something goes wrong (shown to user)
+    // Operator's remote "live camera" switch. true = ask the robot to broadcast
+    // (and show the feed here); false = ask the robot to stop. Keeps the link up.
+    val liveCameraEnabled: Boolean = true,
     // Diagnostic: the role + meet-keys this phone is actually using, so a
     // role/key mismatch (the usual "connected but no video" cause) is visible
     // on screen instead of being invisible.

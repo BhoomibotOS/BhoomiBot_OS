@@ -40,6 +40,7 @@ import com.bhoomibot.os.ui.theme.SignalGreen
 fun SettingsScreen(
     onBackClick: () -> Unit,
     onConnectionClick: () -> Unit = {},
+    onLiveLinkClick: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel()
 ) {
     // Live calibration values from the SettingsViewModel (updates when any slider changes).
@@ -74,6 +75,17 @@ fun SettingsScreen(
                 Column(Modifier.weight(1f)) {
                     Text("CONNECTION", fontWeight = FontWeight.ExtraBold)
                     Text("Bluetooth / WiFi settings for the VCU.", color = MutedText, style = MaterialTheme.typography.bodySmall)
+                }
+                Text(">", color = MutedText, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        // Entry point to the internet live-link configuration (relay URL, Robot ID, session code, video quality).
+        Card(onClick = onLiveLinkClick, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("LIVE LINK", fontWeight = FontWeight.ExtraBold)
+                    Text("Relay URL, Robot ID and session code for the internet live feed.", color = MutedText, style = MaterialTheme.typography.bodySmall)
                 }
                 Text(">", color = MutedText, fontWeight = FontWeight.Bold)
             }

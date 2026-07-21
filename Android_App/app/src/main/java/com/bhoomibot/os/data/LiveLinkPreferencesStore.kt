@@ -33,7 +33,8 @@ data class LiveLinkPreferences(
     val autoReconnect: Boolean = true,
     val networkMode: String = PhoneNetworkMode.INTERNET.name,
     val videoFps: Int = 12,
-    val videoQuality: String = VideoQuality.MEDIUM.name
+    val videoQuality: String = VideoQuality.MEDIUM.name,
+    val recentServerUrls: List<String> = emptyList()
 )
 
 object LiveLinkPreferencesStore {
@@ -44,6 +45,7 @@ object LiveLinkPreferencesStore {
     private val NETWORK_MODE = stringPreferencesKey("live_network_mode")
     private val VIDEO_FPS = intPreferencesKey("live_video_fps")
     private val VIDEO_QUALITY = stringPreferencesKey("live_video_quality")
+    private val RECENT_SERVER_URLS = stringPreferencesKey("live_recent_server_urls")
 
     fun preferences(context: Context): Flow<LiveLinkPreferences> =
         context.liveLinkDataStore.data.map { p ->
@@ -54,7 +56,9 @@ object LiveLinkPreferencesStore {
                 autoReconnect = p[AUTO_RECONNECT] ?: true,
                 networkMode = p[NETWORK_MODE] ?: PhoneNetworkMode.INTERNET.name,
                 videoFps = p[VIDEO_FPS] ?: 12,
-                videoQuality = p[VIDEO_QUALITY] ?: VideoQuality.MEDIUM.name
+                videoQuality = p[VIDEO_QUALITY] ?: VideoQuality.MEDIUM.name,
+                recentServerUrls = p[RECENT_SERVER_URLS]?.split('|')?.filter { it.isNotBlank() }
+                    ?: emptyList()
             )
         }
 
@@ -69,4 +73,25 @@ object LiveLinkPreferencesStore {
             p[VIDEO_QUALITY] = prefs.videoQuality
         }
     }
+
+    /**
+     * Remembers a server URL the user successfully entered, most-recent-first,
+     * deduped, capped at [MAX_RECENT]. The Connection Options screen shows these
+     * as quick-pick chips so the user doesn't have to retype the Render URL.
+     */
+    suspend fun addRecentServerUrl(context: Context, url: String) {
+        if (url.isBlank()) return
+        context.liveLinkDataStore.edit { p ->
+            val current = p[RECENT_SERVER_URLS]?.split('|')?.filter { it.isNotBlank() } ?: emptyList()
+            val updated = (listOf(url) + current.filter { it != url }).take(MAX_RECENT)
+            p[RECENT_SERVER_URLS] = updated.joinToString("|")
+        }
+    }
+
+    /** Clears the remembered server-URL history (e.g. from a settings menu). */
+    suspend fun clearRecentServerUrls(context: Context) {
+        context.liveLinkDataStore.edit { it.remove(RECENT_SERVER_URLS) }
+    }
+
+    private const val MAX_RECENT = 5
 }

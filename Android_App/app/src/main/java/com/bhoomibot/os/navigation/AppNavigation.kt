@@ -21,6 +21,7 @@ import com.bhoomibot.os.feature.operator.OperatorHomeScreen
 import com.bhoomibot.os.feature.robot.RobotHomeScreen
 import com.bhoomibot.os.feature.robot.RobotSectionScreen
 import com.bhoomibot.os.feature.settings.SettingsScreen
+import com.bhoomibot.os.feature.settings.RobotSettingsScreen
 import com.bhoomibot.os.feature.settings.ConnectionSettingsScreen
 import com.bhoomibot.os.model.DeviceRole
 import kotlinx.coroutines.launch
@@ -43,6 +44,7 @@ object AppRoute {
     const val Diagnostics = "diagnostics"
     const val Map = "map"
     const val Settings = "settings"
+    const val RobotSettings = "robotSettings"
     const val ConnectionSettings = "connectionSettings"
     const val ConnectionOptions = "connectionOptions"
     const val RobotLive = "robotLive"
@@ -91,10 +93,18 @@ fun AppNavigation() {
         composable(AppRoute.Settings) {
             SettingsScreen(
                 onBackClick = navController::popBackStack,
-                onConnectionClick = { navController.navigate(AppRoute.ConnectionSettings) }
+                onConnectionClick = { navController.navigate(AppRoute.ConnectionSettings) },
+                onLiveLinkClick = { navController.navigate(AppRoute.ConnectionOptions) }
             )
         }
         composable(AppRoute.ConnectionSettings) { ConnectionSettingsScreen(onBackClick = navController::popBackStack) }
+        composable(AppRoute.RobotSettings) {
+            RobotSettingsScreen(
+                onBackClick = navController::popBackStack,
+                onConnectionClick = { navController.navigate(AppRoute.ConnectionSettings) },
+                onLiveLinkClick = { navController.navigate(AppRoute.ConnectionOptions) }
+            )
+        }
         // Live internet link: configure the relay, then the robot/operator go live.
         composable(AppRoute.ConnectionOptions) {
             ConnectionOptionsScreen(

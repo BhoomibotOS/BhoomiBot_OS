@@ -3,7 +3,7 @@
 #include <DabbleESP32.h>
 
 #define DAC_PIN_RIGHT 25 //right motor
-#define DAC_PIN 26 //left
+#define DAC_PIN_LEFT 26 //left
 #define REV_PIN 27
 
 bool cruiseMode = false;
@@ -76,7 +76,8 @@ void loop()
     digitalWrite(REV_PIN, LOW);
 
     int speedValue = map(y, 1, 7, 30, 255);
-    dacWrite(DAC_PIN, speedValue);
+    dacWrite(DAC_PIN_RIGHT, speedValue);
+    dacWrite(DAC_PIN_LEFT, speedValue);
 
     Serial.print("FORWARD Speed=");
     Serial.println(speedValue);
@@ -86,7 +87,8 @@ void loop()
     digitalWrite(REV_PIN, HIGH);
 
     int speedValue = map(abs(y), 1, 7, 30, 255);
-    dacWrite(DAC_PIN, speedValue);
+    dacWrite(DAC_PIN_RIGHT, speedValue);
+    dacWrite(DAC_PIN_LEFT, speedValue);
 
     Serial.print("REVERSE Speed=");
     Serial.println(speedValue);
@@ -95,7 +97,8 @@ void loop()
   {
     digitalWrite(REV_PIN, LOW);
 
-    dacWrite(DAC_PIN, 0);
+    dacWrite(DAC_PIN_RIGHT, 0);
+    dacWrite(DAC_PIN_LEFT, 0);
 
     Serial.println("STOP");
   }

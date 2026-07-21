@@ -41,6 +41,7 @@ object LivePayloads {
         put("emergencyStop", c.emergencyStop)
         putOpt("pto", c.pto)
         putOpt("lights", c.lights)
+        putOpt("liveCamera", c.liveCamera)
     }.toString()
 
     fun decodeCommand(json: String?): RobotCommand? = runCatching {
@@ -54,7 +55,8 @@ object LivePayloads {
             emergencyStop = o.optBoolean("emergencyStop", false),
             // isNull preserves the tri-state: JSON null -> null ("leave unchanged").
             pto = if (o.isNull("pto")) null else o.optBoolean("pto"),
-            lights = if (o.isNull("lights")) null else o.optBoolean("lights")
+            lights = if (o.isNull("lights")) null else o.optBoolean("lights"),
+            liveCamera = if (o.isNull("liveCamera")) null else o.optBoolean("liveCamera")
         )
     }.getOrNull()
 

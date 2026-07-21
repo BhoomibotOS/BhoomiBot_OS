@@ -31,6 +31,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bhoomibot.os.ui.theme.MutedText
 import com.bhoomibot.os.ui.theme.SafetyRed
@@ -53,6 +61,22 @@ fun ConnectionSettingsScreen(
     // True when the selected mode needs the Bluetooth MAC and/or the WiFi host+port.
     val needsBluetooth = prefs.connectionType != ConnectionType.WIFI_HOTSPOT
     val needsWifi = prefs.connectionType != ConnectionType.BLUETOOTH
+
+    val context = LocalContext.current
+    // Launches the Bluetooth permission dialog and (re)starts the connection test once answered.
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        if (results.values.all { it }) {
+            viewModel.testConnection()
+        } else {
+            Toast.makeText(
+                context,
+                "Bluetooth permissions are required to test the connection.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         // Top bar: back arrow + title.
@@ -153,10 +177,42 @@ fun ConnectionSettingsScreen(
                     Text("Verify the ESP32 is reachable with the settings above. Nothing is saved.", color = MutedText, style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(12.dp))
                     Button(
-                        onClick = viewModel::testConnection,
+                        onClick = {
+                            // Permission handling (Android 12+)
+                            val missing = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                mutableListOf<String>().apply {
+                                    if (ContextCompat.checkSelfPermission(
+                                            context,
+                                            android.Manifest.permission.BLUETOOTH_CONNECT
+                                        ) != PackageManager.PERMISSION_GRANTED
+                                    ) {
+                                        add(android.Manifest.permission.BLUETOOTH_CONNECT)
+                                    }
+                                    if (ContextCompat.checkSelfPermission(
+                                            context,
+                                            android.Manifest.permission.BLUETOOTH_SCAN
+                                        ) != PackageManager.PERMISSION_GRANTED
+                                    ) {
+                                        add(android.Manifest.permission.BLUETOOTH_SCAN)
+                                    }
+                                }
+                            } else {
+                                mutableListOf()
+                            }
+                            if (missing.isNotEmpty()) {
+                                // Launch the system permission dialog for missing permissions.
+                                permissionLauncher.launch(missing.toTypedArray())
+                            } else {
+                                // All required permissions are already granted – run the test.
+                                viewModel.testConnection()
+                            }
+                        },
                         enabled = !isTesting,
                         modifier = Modifier.fillMaxWidth().height(46.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary,
+                            contentColor = MaterialTheme.colorScheme.onSecondary
+                        )
                     ) { Text(if (isTesting) "TESTING…" else "TEST CONNECTION", fontWeight = FontWeight.Bold) }
                     // Shows the outcome of the last test (green = success, red = failure).
                     testStatus?.let { status ->

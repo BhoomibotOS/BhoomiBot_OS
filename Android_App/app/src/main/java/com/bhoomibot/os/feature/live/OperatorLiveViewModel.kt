@@ -141,6 +141,19 @@ class OperatorLiveViewModel(application: Application) : AndroidViewModel(applica
         repository.sendCommand(RobotCommand(emergencyStop = true, drive = DriveCommand.EMERGENCY_STOP))
     }
 
+    // Remote "live camera" switch: tells the robot to START (true) or STOP (false)
+    // broadcasting its camera. Stopping keeps the relay connection alive.
+    fun sendLiveCamera(on: Boolean) {
+        repository.sendCommand(RobotCommand(liveCamera = on))
+    }
+
+    // Operator's "live camera" toggle on this screen: updates the local view
+    // state and remotely tells the robot to start/stop broadcasting.
+    fun setLiveCameraEnabled(on: Boolean) {
+        _uiState.update { it.copy(liveCameraEnabled = on) }
+        sendLiveCamera(on)
+    }
+
     // Auxiliary toggles (power take-off, lights). Not wired to the current UI
     // but available for the options/aux controls.
     fun togglePto(on: Boolean) {

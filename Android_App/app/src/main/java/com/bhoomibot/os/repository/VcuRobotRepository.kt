@@ -15,13 +15,16 @@ import com.bhoomibot.os.model.DriveCommand
 import com.bhoomibot.os.model.RobotStatus
 import com.bhoomibot.os.vcu.ConnectionManager
 import com.bhoomibot.os.vcu.ConnectionPreferences
+import com.bhoomibot.os.vcu.hydraulicCommand
+import com.bhoomibot.os.vcu.hornCommand
 import com.bhoomibot.os.vcu.lightsCommand
 import com.bhoomibot.os.vcu.ptoCommand
 import com.bhoomibot.os.vcu.speedCommand
 import com.bhoomibot.os.vcu.toProtocol
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -41,7 +44,9 @@ class VcuRobotRepository(private val context: Context) : RobotRepository {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var manager: ConnectionManager? = null
-    private var connectJob: Job? = null
+    // Connect exactly once and reuse the socket; @Volatile so concurrent send coroutines see it.
+    private val connectMutex = Mutex()
+    @Volatile private var isConnected = false
 
     private suspend fun manager(): ConnectionManager {
         if (manager == null) {
@@ -51,15 +56,22 @@ class VcuRobotRepository(private val context: Context) : RobotRepository {
         return manager!!
     }
 
-    // Lazily connect once; reuse the existing connection for later commands.
+    // Connect once and reuse the socket for every later send. The Mutex serializes the connect
+    // decision so two rapid sends (e.g. speed + direction) can't both call connect() — the old
+    // code reconnected on every pair and the second connect() closed the in-flight socket,
+    // dropping the direction command.
     private fun sendAsync(cmd: String) {
         scope.launch {
             runCatching {
                 val m = manager()
-                if (connectJob?.isCompleted != false) connectJob = launch { m.connect() }
-                connectJob?.join()
+                connectMutex.withLock {
+                    if (!isConnected) {
+                        m.connect()
+                        isConnected = true
+                    }
+                }
                 m.send(cmd)
-            }
+            }.onFailure { isConnected = false }
         }
     }
 
@@ -73,7 +85,11 @@ class VcuRobotRepository(private val context: Context) : RobotRepository {
 
     override fun setLights(enabled: Boolean) = sendAsync(lightsCommand(enabled))
 
+    override fun setHydraulic(heightPercent: Int) = sendAsync(hydraulicCommand(heightPercent))
+
+    override fun horn() = sendAsync(hornCommand())
+
     override fun disconnect() {
-        scope.launch { runCatching { manager()?.disconnect() } }
+        scope.launch { runCatching { manager()?.disconnect(); isConnected = false } }
     }
 }

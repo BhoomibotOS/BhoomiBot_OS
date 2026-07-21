@@ -31,6 +31,12 @@ interface RobotRepository {
     // Turns the work lights on/off.
     fun setLights(enabled: Boolean)
 
+    // Sets the hydraulic lift height as a PWM duty % (0 = retracted/off).
+    fun setHydraulic(heightPercent: Int)
+
+    // Pulses the horn once (one-shot, like GamePad.isSelectPressed()).
+    fun horn()
+
     // Releases the underlying transport (Bluetooth socket / WiFi connection). No-op by default.
     fun disconnect() = Unit
 }

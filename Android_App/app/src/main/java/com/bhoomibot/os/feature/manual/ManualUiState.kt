@@ -18,7 +18,7 @@ enum class DrivingMode {
 data class ManualUiState(
     val robotStatus: RobotStatus = RobotStatus(),      // Battery/mode/GPS/camera/AI snapshot shown at top
     val drivingMode: DrivingMode = DrivingMode.DIGITAL, // Which drive control is active (DIGITAL or JOYSTICK)
-    val vehicleSpeedPercent: Int = 0,                  // Current drive speed in m/s (0 = stopped)
+    val vehicleSpeedPercent: Int = 0,                  // Signed drive speed: + = forward, - = reverse, 0 = stopped
     val ptoEnabled: Boolean = false,                   // PTO attachment on/off
     val ptoSpeedPercent: Int = 0,                      // PTO speed when enabled (0–100%)
     val lightsEnabled: Boolean = false,                // Work lights on/off

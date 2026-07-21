@@ -1,9 +1,9 @@
 /**
  * Single decision point for which [RobotRepository] the app uses.
  *
- * `USE_REAL_TRANSPORT = false` (default) returns the no-op [LocalRobotRepository] so the app runs
- * with no robot paired. Set it `true` ONLY after the ESP32 firmware parses the raw serial protocol
- * in `vcu/VcuProtocol.kt` (today's firmware speaks Dabble BLE, not raw serial — see the in-file note).
+ * `USE_REAL_TRANSPORT = true` drives the real ESP32/VCU over [ConnectionManager]. The ESP32 firmware
+ * that parses the raw serial protocol in `vcu/VcuProtocol.kt` is `VCU/VCU_joystick/VCU_joystick.ino`.
+ * Set it `false` to fall back to the no-op [LocalRobotRepository] (app runs with no robot paired).
  */
 package com.bhoomibot.os.repository
 
@@ -17,11 +17,11 @@ import com.bhoomibot.os.data.LocalRobotRepository
  *   paired and every command is a safe no-op.
  * - `true`: the real [VcuRobotRepository], which drives the ESP32 over [ConnectionManager].
  *
- * NOTE: flip this to `true` ONLY after the VCU firmware parses the serial protocol defined in
- * `vcu/VcuProtocol.kt`. The current firmware (VCU_till_fixed_and_var_code_with_bluetooth.ino)
- * speaks the Dabble BLE gamepad protocol, so a raw-serial transport will not be understood yet.
+ * NOTE: the matching ESP32 firmware is `VCU/VCU_joystick/VCU_joystick.ino`, which parses the
+ * serial protocol defined here. The older `VCU_till_fixed_and_var_code_with_bluetooth.ino` spoke
+ * the Dabble BLE gamepad protocol and is kept only as a reference demo.
  */
-const val USE_REAL_TRANSPORT = false
+const val USE_REAL_TRANSPORT = true
 
 fun provideRobotRepository(application: Application): RobotRepository =
     if (USE_REAL_TRANSPORT) VcuRobotRepository(application.applicationContext)

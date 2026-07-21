@@ -45,26 +45,46 @@ class ManualViewModel(application: Application) : AndroidViewModel(application) 
 
     // Switch between DIGITAL (buttons) and JOYSTICK drive modes.
     fun setDrivingMode(mode: DrivingMode) { _uiState.value = _uiState.value.copy(drivingMode = mode) }
-    // Digital drive button handlers: each adds one "drive step" of speed in that direction.
-    fun onForward() = changeDigitalSpeed(DriveCommand.FORWARD)
-    fun onReverse() = changeDigitalSpeed(DriveCommand.REVERSE)
-    fun onLeft() = changeDigitalSpeed(DriveCommand.LEFT)
-    fun onRight() = changeDigitalSpeed(DriveCommand.RIGHT)
-    // Stop: send STOP and zero the displayed speed.
-    fun onStop() { repository.sendDriveCommand(DriveCommand.STOP); _uiState.value = _uiState.value.copy(vehicleSpeedPercent = 0, lastCommand = DriveCommand.STOP) }
+    // Digital drive buttons implement a SIGNED-speed, joystick-toy model:
+    //   UP   = increase speed toward +max (forward)
+    //   DOWN = decrease speed through 0 toward -max (reverse; PIN27 goes HIGH past 0)
+    //   LEFT / RIGHT = steer (slow the inner wheel) at the CURRENT speed
+    //   STOP = speed 0
+    // vehicleSpeedPercent is reused as the signed speed: -max..+max, 0 = stopped.
+    fun onForward() = applySignedSpeed(+1)
+    fun onReverse() = applySignedSpeed(-1)
+    fun onLeft() = applySteer(DriveCommand.LEFT)
+    fun onRight() = applySteer(DriveCommand.RIGHT)
+    // Stop: speed 0.
+    fun onStop() {
+        repository.updateSpeed(0)
+        repository.sendDriveCommand(DriveCommand.STOP)
+        _uiState.value = _uiState.value.copy(vehicleSpeedPercent = 0, lastCommand = DriveCommand.STOP)
+    }
     // Emergency stop: send EMERGENCY_STOP (hard halt) and zero the displayed speed.
-    fun onEmergencyStop() { repository.sendDriveCommand(DriveCommand.EMERGENCY_STOP); _uiState.value = _uiState.value.copy(vehicleSpeedPercent = 0, lastCommand = DriveCommand.EMERGENCY_STOP) }
-    // Joystick drag: magnitude (0–1) scales to m/s; releases to 0 send STOP.
+    fun onEmergencyStop() {
+        repository.sendDriveCommand(DriveCommand.EMERGENCY_STOP)
+        _uiState.value = _uiState.value.copy(vehicleSpeedPercent = 0, lastCommand = DriveCommand.EMERGENCY_STOP)
+    }
+    // Joystick drag: magnitude (0–1) scales to speed; sign follows the stick (up = +/forward,
+    // down = -/reverse) so the read-out matches the digital model. Release to 0 sends STOP.
     fun onJoystickChanged(magnitude: Float, command: DriveCommand) {
-        val speed = (magnitude.coerceIn(0f, 1f) * ControlCalibrationStore.calibration.value.maximumSpeedMetersPerSecond).toInt()
-        repository.updateSpeed(speed); repository.sendDriveCommand(if (speed == 0) DriveCommand.STOP else command)
-        _uiState.value = _uiState.value.copy(vehicleSpeedPercent = speed, lastCommand = if (speed == 0) DriveCommand.STOP else command)
+        val max = ControlCalibrationStore.calibration.value.maximumSpeedMetersPerSecond
+        val raw = (magnitude.coerceIn(0f, 1f) * max).toInt()
+        val signed = if (command == DriveCommand.REVERSE) -raw else raw
+        repository.updateSpeed(toVcuPercent(signed))
+        repository.sendDriveCommand(if (raw == 0) DriveCommand.STOP else command)
+        _uiState.value = _uiState.value.copy(
+            vehicleSpeedPercent = signed,
+            lastCommand = if (raw == 0) DriveCommand.STOP else command
+        )
     }
     /** Callback reserved for a future external speed source or control profile. */
     fun onVehicleSpeedChanged(speed: Int) {
-        val boundedSpeed = speed.coerceIn(0, ControlCalibrationStore.calibration.value.maximumSpeedMetersPerSecond)
-        repository.updateSpeed(boundedSpeed)
-        _uiState.value = _uiState.value.copy(vehicleSpeedPercent = boundedSpeed)
+        val max = ControlCalibrationStore.calibration.value.maximumSpeedMetersPerSecond
+        val bounded = speed.coerceIn(-max, max)
+        repository.updateSpeed(toVcuPercent(bounded))
+        _uiState.value = _uiState.value.copy(vehicleSpeedPercent = bounded)
     }
     // PTO switch: turn attachment on/off. When switched OFF the PTO speed resets to 0.
     fun onPtoToggle(enabled: Boolean) {
@@ -82,15 +102,21 @@ class ManualViewModel(application: Application) : AndroidViewModel(application) 
     }
     // Work lights switch: turn on/off and reflect in state.
     fun onLightsToggle(enabled: Boolean) { repository.setLights(enabled); _uiState.value = _uiState.value.copy(lightsEnabled = enabled) }
-    // Hydraulic switch: turn on/off. When switched OFF the height resets to 0.
+    // Hydraulic switch: turn on/off. When switched OFF the height resets to 0 and the lift retracts.
     fun onHydraulicToggle(enabled: Boolean) {
+        val height = if (enabled) _uiState.value.hydraulicHeightPercent else 0
+        repository.setHydraulic(height)
         _uiState.value = _uiState.value.copy(
             hydraulicEnabled = enabled,
-            hydraulicHeightPercent = if (enabled) _uiState.value.hydraulicHeightPercent else 0
+            hydraulicHeightPercent = height
         )
     }
-    // Hydraulic height slider: snaps to the configured step increment.
-    fun onHydraulicHeightChanged(height: Int) { _uiState.value = _uiState.value.copy(hydraulicHeightPercent = snapToStep(height, ControlCalibrationStore.calibration.value.hydraulicHeightStepPercent)) }
+    // Hydraulic height slider: snaps to the configured step increment and pushes it to the VCU.
+    fun onHydraulicHeightChanged(height: Int) {
+        val snapped = snapToStep(height, ControlCalibrationStore.calibration.value.hydraulicHeightStepPercent)
+        repository.setHydraulic(snapped)
+        _uiState.value = _uiState.value.copy(hydraulicHeightPercent = snapped)
+    }
     // Camera torch/flash toggle.
     fun onCameraLightToggle(enabled: Boolean) { _uiState.value = _uiState.value.copy(cameraLightEnabled = enabled) }
     // Learning/recording-mode toggle: when ON the Robot Phone should capture manual driving
@@ -101,15 +127,39 @@ class ManualViewModel(application: Application) : AndroidViewModel(application) 
     fun setCameraMaximized(maximized: Boolean) { _uiState.value = _uiState.value.copy(isCameraMaximized = maximized) }
     // Turn the live camera feed ON/OFF (the "Live camera" switch).
     fun setCameraEnabled(enabled: Boolean) { _uiState.value = _uiState.value.copy(cameraEnabled = enabled) }
-    // Horn button: no-op today, reserved for a future VCU auxiliary-output command.
-    fun onHorn() = Unit // Reserved for a future VCU auxiliary-output command.
+    // Horn button: pulse the horn once (one-shot, like GamePad.isSelectPressed()).
+    fun onHorn() = repository.horn()
 
-    // Helper: add one drive-step of speed for a digital button, capped at the maximum speed.
-    private fun changeDigitalSpeed(command: DriveCommand) {
-        val calibration = ControlCalibrationStore.calibration.value
-        val speed = (_uiState.value.vehicleSpeedPercent + calibration.driveStepMetersPerSecond).coerceAtMost(calibration.maximumSpeedMetersPerSecond)
-        repository.updateSpeed(speed); repository.sendDriveCommand(command)
-        _uiState.value = _uiState.value.copy(vehicleSpeedPercent = speed, lastCommand = command)
+    // Helper: nudge the signed speed by one step (+1 = up/forward, -1 = down/reverse), clamped
+    // to +/-max. The direction token sent to the VCU follows the resulting sign.
+    private fun applySignedSpeed(direction: Int) {
+        val calib = ControlCalibrationStore.calibration.value
+        val next = (_uiState.value.vehicleSpeedPercent + direction * calib.driveStepMetersPerSecond)
+            .coerceIn(-calib.maximumSpeedMetersPerSecond, calib.maximumSpeedMetersPerSecond)
+        val command = when {
+            next > 0 -> DriveCommand.FORWARD
+            next < 0 -> DriveCommand.REVERSE
+            else -> DriveCommand.STOP
+        }
+        repository.updateSpeed(toVcuPercent(next))
+        repository.sendDriveCommand(command)
+        _uiState.value = _uiState.value.copy(vehicleSpeedPercent = next, lastCommand = command)
+    }
+    // Helper: steering does NOT change speed — it re-asserts the current signed speed while setting
+    // the turn direction, so the robot arcs at whatever speed it is already travelling.
+    private fun applySteer(command: DriveCommand) {
+        val speed = _uiState.value.vehicleSpeedPercent
+        repository.updateSpeed(toVcuPercent(speed))
+        repository.sendDriveCommand(command)
+        _uiState.value = _uiState.value.copy(lastCommand = command)
+    }
+    // The UI tracks speed in m/s, but the VCU's SPD contract is a 0..100 percentage. Scale the
+    // signed m/s value into the VCU's signed percentage so "full speed" maps to full PWM (255)
+    // rather than just the low end of the range.
+    private fun toVcuPercent(signedMetersPerSecond: Int): Int {
+        val max = ControlCalibrationStore.calibration.value.maximumSpeedMetersPerSecond
+        if (max == 0) return 0
+        return (signedMetersPerSecond * 100 / max).coerceIn(-100, 100)
     }
     // Helper: send a raw drive command and record it as the last command.
     private fun send(command: DriveCommand) { repository.sendDriveCommand(command); _uiState.value = _uiState.value.copy(lastCommand = command) }

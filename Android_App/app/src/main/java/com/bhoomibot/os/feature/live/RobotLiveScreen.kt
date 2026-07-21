@@ -333,8 +333,21 @@ private fun analyzeFrame(proxy: ImageProxy, fps: Int, quality: VideoQuality, onF
     lastAnalyzeTs = now
 
     // Convert the camera buffer to a Bitmap; bail (still closing) if it fails.
-    val bitmap = runCatching { proxy.toBitmap() }.getOrNull() ?: run { proxy.close(); return }
+    val raw = runCatching { proxy.toBitmap() }.getOrNull() ?: run { proxy.close(); return }
     proxy.close()
+
+    // The raw ImageProxy is in the SENSOR's orientation, which is rotated
+    // relative to what the on-device PreviewView shows (CameraX rotates the
+    // preview for us). Bake that rotation in here so the frame the operator
+    // receives already matches the robot's own preview — the operator then
+    // draws it verbatim and never needs to rotate it.
+    val rotation = proxy.imageInfo.rotationDegrees
+    val bitmap = if (rotation != 0) {
+        val m = android.graphics.Matrix().apply { postRotate(rotation.toFloat()) }
+        val rotated = android.graphics.Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, m, true)
+        raw.recycle()
+        rotated
+    } else raw
 
     // Shrink to the quality tier's max dimension, then jpeg-compress at its
     // quality level. Smaller/lower-quality = less data over the link.
