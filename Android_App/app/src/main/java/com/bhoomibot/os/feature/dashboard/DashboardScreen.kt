@@ -74,12 +74,12 @@ fun DashboardScreen(onNavigate: (String) -> Unit, viewModel: DashboardViewModel 
     // The six operation shortcuts shown as tappable cards on the home screen.
     // Each entry pairs a display title + icon with the navigation route it opens.
     val features = listOf(
-        DashboardFeature("Manual", Icons.Default.SportsEsports, AppRoute.Manual),         // Manual drive controls
-        DashboardFeature("Autonomous", Icons.Default.SmartToy, AppRoute.Autonomous),     // Autonomous (future)
-        DashboardFeature("Camera", Icons.Default.CameraAlt, AppRoute.Camera),            // Camera feed (future)
-        DashboardFeature("Diagnostics", Icons.Default.Analytics, AppRoute.Diagnostics),  // Diagnostics (future)
-        DashboardFeature("Map", Icons.Default.Map, AppRoute.Map),                        // Map (future)
-        DashboardFeature("Settings", Icons.Default.Settings, AppRoute.Settings)          // Control calibration
+        DashboardFeature("Manual", Icons.Default.SportsEsports, AppRoute.Manual),
+        DashboardFeature("Agent AI", Icons.Default.SmartToy, AppRoute.AgentChat),
+        DashboardFeature("Camera", Icons.Default.CameraAlt, AppRoute.Camera),
+        DashboardFeature("Diagnostics", Icons.Default.Analytics, AppRoute.Diagnostics),
+        DashboardFeature("Map", Icons.Default.Map, AppRoute.Map),
+        DashboardFeature("Settings", Icons.Default.Settings, AppRoute.Settings)
     )
 
     // Scrollable column holding the whole dashboard layout.

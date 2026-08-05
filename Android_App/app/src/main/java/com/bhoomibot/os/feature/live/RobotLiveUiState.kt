@@ -4,6 +4,8 @@ import com.bhoomibot.os.connection.model.PeerStatus
 import com.bhoomibot.os.connection.model.RobotCommand
 import com.bhoomibot.os.connection.model.VideoQuality
 import com.bhoomibot.os.connection.transport.LiveConnectionState
+import com.bhoomibot.os.feature.autonomous.ai.DetectedObject
+import com.bhoomibot.os.feature.connection.PhoneNetworkMode
 import com.bhoomibot.os.model.DeviceRole
 
 /**
@@ -31,5 +33,9 @@ data class RobotLiveUiState(
     // on screen instead of being invisible.
     val activeRole: DeviceRole? = null,
     val activeRobotId: String = "",
-    val activeSession: String = ""
+    val activeSession: String = "",
+    val networkMode: PhoneNetworkMode = PhoneNetworkMode.INTERNET,
+    val aiStatus: String = "Inactive",
+    val aiSteeringOffset: Float = 0f,
+    val detectedObjects: List<DetectedObject> = emptyList()
 )

@@ -13,11 +13,11 @@ package com.bhoomibot.os.model
 data class ControlCalibration(
     // How much speed (in m/s) is added per single tap of a digital drive button (FORWARD/REVERSE/LEFT/RIGHT).
     // Kept well below maximumSpeedMetersPerSecond so a tap ramps speed gradually (e.g. ~5 taps to full).
-    val driveStepMetersPerSecond: Int = 2,
+    val driveStepMetersPerSecond: Int = 1,
     // Hard speed ceiling for the robot, in m/s. Digital drive can never exceed this.
-    val maximumSpeedMetersPerSecond: Int = 10,
+    val maximumSpeedMetersPerSecond: Int = 50,
     // How much the PTO speed slider jumps per step (in %), set in Settings.
-    val ptoStepPercent: Int = 10,
+    val ptoStepPercent: Int = 0,
     // How much the hydraulic height slider jumps per step (in %), set in Settings.
-    val hydraulicHeightStepPercent: Int = 10
+    val hydraulicHeightStepPercent: Int = 0
 )

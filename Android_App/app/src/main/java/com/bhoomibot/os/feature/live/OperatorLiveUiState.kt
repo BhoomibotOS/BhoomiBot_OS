@@ -4,6 +4,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import com.bhoomibot.os.connection.model.PeerStatus
 import com.bhoomibot.os.connection.model.TelemetrySnapshot
 import com.bhoomibot.os.connection.transport.LiveConnectionState
+import com.bhoomibot.os.feature.autonomous.ai.DetectedObject
+import com.bhoomibot.os.feature.connection.PhoneNetworkMode
 import com.bhoomibot.os.model.DeviceRole
 
 /**
@@ -21,10 +23,15 @@ data class OperatorLiveUiState(
     // Operator's remote "live camera" switch. true = ask the robot to broadcast
     // (and show the feed here); false = ask the robot to stop. Keeps the link up.
     val liveCameraEnabled: Boolean = true,
+    val useRearCamera: Boolean = true,
     // Diagnostic: the role + meet-keys this phone is actually using, so a
     // role/key mismatch (the usual "connected but no video" cause) is visible
     // on screen instead of being invisible.
     val activeRole: DeviceRole? = null,
     val activeRobotId: String = "",
-    val activeSession: String = ""
+    val activeSession: String = "",
+    val networkMode: PhoneNetworkMode = PhoneNetworkMode.INTERNET,
+    val aiStatus: String = "Inactive",
+    val aiSteeringOffset: Float = 0f,
+    val detectedObjects: List<DetectedObject> = emptyList()
 )

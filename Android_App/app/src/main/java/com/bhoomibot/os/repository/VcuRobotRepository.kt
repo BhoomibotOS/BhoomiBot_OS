@@ -1,15 +1,7 @@
-/**
- * REAL robot transport (used when `USE_REAL_TRANSPORT = true`).
- *
- * Drives the ESP32/VCU through [com.bhoomibot.os.vcu.ConnectionManager], which owns the actual
- * Bluetooth/Wi-Fi socket. [RobotRepository] is deliberately non-suspend, so every command is sent
- * fire-and-forget on a SupervisorJob + IO scope; a failed send is swallowed via runCatching so the
- * UI never crashes. The connection is opened lazily and reused. See in-file notes for the
- * AndroidViewModel constructor gotcha (the repository is a field, not a default param).
- */
 package com.bhoomibot.os.repository
 
 import android.content.Context
+import android.widget.Toast
 import com.bhoomibot.os.data.ConnectionPreferencesStore
 import com.bhoomibot.os.model.DriveCommand
 import com.bhoomibot.os.model.RobotStatus
@@ -21,75 +13,154 @@ import com.bhoomibot.os.vcu.lightsCommand
 import com.bhoomibot.os.vcu.ptoCommand
 import com.bhoomibot.os.vcu.speedCommand
 import com.bhoomibot.os.vcu.toProtocol
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
 /**
  * Real transport implementation of [RobotRepository].
- *
- * It drives the ESP32/VCU through [ConnectionManager], which owns the actual Bluetooth/WiFi
- * socket. [RobotRepository] is deliberately non-suspend, so every command is sent fire-and-forget
- * on a [SupervisorJob] + [Dispatchers.IO] scope. A failed send (e.g. no paired device, or the
- * current firmware not parsing serial) is swallowed via [runCatching] so the UI never crashes.
- *
- * The connection is established lazily on first use and reused for subsequent commands; [disconnect]
- * tears it down (call from the ViewModel's onCleared).
+ * AI-Fix: Uses a single persistent Command Loop and lifecycle-safe listeners.
  */
 class VcuRobotRepository(private val context: Context) : RobotRepository {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var manager: ConnectionManager? = null
-    // Connect exactly once and reuse the socket; @Volatile so concurrent send coroutines see it.
     private val connectMutex = Mutex()
-    @Volatile private var isConnected = false
+    private val _isConnected = MutableStateFlow(false)
+    override val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
-    private suspend fun manager(): ConnectionManager {
-        if (manager == null) {
-            val prefs: ConnectionPreferences = ConnectionPreferencesStore.preferences(context).first()
+    private val _rpmData = MutableStateFlow(Pair(0, 0))
+    override val rpmData: StateFlow<Pair<Int, Int>> = _rpmData.asStateFlow()
+
+    private val commandChannel = Channel<String>(Channel.BUFFERED)
+    private var telemetryJob: Job? = null
+
+    init {
+        // AI-Fix: Initial connection attempt to start telemetry
+        repositoryScope.launch {
+            try {
+                ensureConnected()
+            } catch (e: Exception) {
+                android.util.Log.e("VCU", "Initial connection failed: ${e.message}")
+            }
+        }
+
+        // Start the single persistent command processing loop
+        repositoryScope.launch {
+            for (cmd in commandChannel) {
+                try {
+                    val m = ensureConnected()
+                    if (m != null) {
+                        m.send(cmd)
+                        _isConnected.value = true
+                    } else {
+                        _isConnected.value = false
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("VCU", "Write failed: ${e.message}")
+                    _isConnected.value = false
+                }
+            }
+        }
+    }
+
+    private suspend fun getManager(): ConnectionManager {
+        val prefs: ConnectionPreferences = ConnectionPreferencesStore.preferences(context).first()
+        if (manager == null || _currentPrefs != prefs) {
+            manager?.disconnect()
+            _currentPrefs = prefs
             manager = ConnectionManager(context, prefs)
         }
         return manager!!
     }
 
-    // Connect once and reuse the socket for every later send. The Mutex serializes the connect
-    // decision so two rapid sends (e.g. speed + direction) can't both call connect() — the old
-    // code reconnected on every pair and the second connect() closed the in-flight socket,
-    // dropping the direction command.
-    private fun sendAsync(cmd: String) {
-        scope.launch {
-            runCatching {
-                val m = manager()
-                connectMutex.withLock {
-                    if (!isConnected) {
-                        m.connect()
-                        isConnected = true
-                    }
+    private var _currentPrefs: ConnectionPreferences? = null
+
+    private suspend fun ensureConnected(): ConnectionManager? {
+        if (_isConnected.value && manager != null) return manager
+        
+        return connectMutex.withLock {
+            if (!_isConnected.value || manager == null) {
+                try {
+                    val m = getManager()
+                    m.connect()
+                    
+                    // We must call receive() to actually trigger the blocking connect() in ConnectionManager
+                    // Start telemetry before marking as connected
+                    startTelemetryListener(m)
+                    
+                    // Small delay to allow the first receive attempt to succeed or fail
+                    delay(500)
+                    
+                    _isConnected.value = true
+                    m
+                } catch (e: Exception) {
+                    android.util.Log.e("VCU", "Connection error: ${e.message}")
+                    _isConnected.value = false
+                    null
                 }
-                m.send(cmd)
-            }.onFailure { isConnected = false }
+            } else manager
         }
     }
 
-    override fun status(): RobotStatus = RobotStatus()
+    private fun startTelemetryListener(m: ConnectionManager) {
+        telemetryJob?.cancel()
+        telemetryJob = repositoryScope.launch {
+            try {
+                m.receive().collect { line ->
+                    if (line.startsWith("RPM ")) {
+                        runCatching {
+                            val data = line.substring(4).split(",")
+                            if (data.size == 2) {
+                                val left = data[0].trim().toIntOrNull() ?: 0
+                                val right = data[1].trim().toIntOrNull() ?: 0
+                                _rpmData.value = Pair(left, right)
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                _isConnected.value = false
+            }
+        }
+    }
 
-    override fun sendDriveCommand(command: DriveCommand) = sendAsync(command.toProtocol())
+    override fun status(): RobotStatus = RobotStatus(isOnline = _isConnected.value)
 
-    override fun updateSpeed(percent: Int) = sendAsync(speedCommand(percent))
+    override fun sendDriveCommand(command: DriveCommand) {
+        commandChannel.trySend(command.toProtocol())
+    }
 
-    override fun setPto(enabled: Boolean) = sendAsync(ptoCommand(enabled))
+    override fun updateSpeed(percent: Int) {
+        commandChannel.trySend(speedCommand(percent))
+    }
 
-    override fun setLights(enabled: Boolean) = sendAsync(lightsCommand(enabled))
+    override fun setPto(enabled: Boolean) {
+        commandChannel.trySend(ptoCommand(enabled))
+    }
 
-    override fun setHydraulic(heightPercent: Int) = sendAsync(hydraulicCommand(heightPercent))
+    override fun setLights(enabled: Boolean) {
+        commandChannel.trySend(lightsCommand(enabled))
+    }
 
-    override fun horn() = sendAsync(hornCommand())
+    override fun setHydraulic(heightPercent: Int) {
+        commandChannel.trySend(hydraulicCommand(heightPercent))
+    }
+
+    override fun horn() {
+        commandChannel.trySend(hornCommand())
+    }
 
     override fun disconnect() {
-        scope.launch { runCatching { manager()?.disconnect(); isConnected = false } }
+        repositoryScope.launch { 
+            telemetryJob?.cancel()
+            manager?.disconnect()
+            _isConnected.value = false
+        }
     }
 }

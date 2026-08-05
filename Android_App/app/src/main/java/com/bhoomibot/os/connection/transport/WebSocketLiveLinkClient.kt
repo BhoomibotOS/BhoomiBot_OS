@@ -44,6 +44,7 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
+import okio.ByteString.Companion.toByteString
 import android.util.Log
 import java.net.URI
 import java.util.concurrent.TimeUnit
@@ -94,9 +95,13 @@ class WebSocketLiveLinkClient(
     override val connectionState: StateFlow<LiveConnectionState> = _state.asStateFlow()
     override val lastError: StateFlow<String?> = _lastError.asStateFlow()
 
-    // Re-point at a new config (server/robotId/session). Takes effect on the next
-    // openOnce() call; the repository calls this just before connect().
-    override fun updateConfig(next: ConnectionConfig) { config = next }
+    // Re-point at a new config. 
+    override fun updateConfig(next: ConnectionConfig) { 
+        if (config != next && _state.value != LiveConnectionState.IDLE) {
+            disconnect() 
+        }
+        config = next 
+    }
 
     override fun connect() {
         Log.d(TAG, "[RELAY] connect() called — loop already active? ${loopJob?.isActive == true}")
@@ -127,17 +132,16 @@ class WebSocketLiveLinkClient(
             // First try shows CONNECTING; any retry shows RECONNECTING.
             _state.value = if (attempt == 0) LiveConnectionState.CONNECTING
             else LiveConnectionState.RECONNECTING
+            
             val opened = openOnce()
-            if (opened) attempt = 0 // fresh success -> clear the backoff counter
-            else {
+            
+            if (opened) {
+                attempt = 0
+            } else {
                 if (!config.autoReconnect) {
-                    // Reconnect disabled: fail hard and stop the loop.
                     _state.value = LiveConnectionState.ERROR
                     return
                 }
-                // Capped exponential backoff: 1s, 2s, 4s, 8s, 16s, then 32s->30s cap.
-                // `attempt.coerceAtMost(5)` caps the left-shift so 1 shl n never blows
-                // up; min(..., 30_000L) caps the final wait at 30 seconds.
                 val backoff = min(1000L * (1 shl attempt.coerceAtMost(5)), 30_000L)
                 _state.value = LiveConnectionState.RECONNECTING
                 delay(backoff)
@@ -238,8 +242,7 @@ class WebSocketLiveLinkClient(
         }
     }
 
-    // The first message on every connection. The relay uses role + session code to
-    // match this phone with its counterpart (OPERATOR <-> ROBOT) in the same session.
+    // The first message on every connection.
     private fun sendHello() {
         val payload = org.json.JSONObject().apply {
             put("role", config.role.name)
@@ -261,10 +264,9 @@ class WebSocketLiveLinkClient(
         runCatching { webSocket?.send(LiveEnvelopeSerializer.encode(envelope)) }
     }
 
-    // Send jpeg bytes as a binary frame (outside the JSON envelope). Same best-effort
-    // semantics as send(): a frame lost during a drop is fine, the next one follows.
+    // Send jpeg bytes as a binary frame (outside the JSON envelope).
     override fun sendFrame(jpeg: ByteArray) {
-        runCatching { webSocket?.send(ByteString.of(*jpeg)) }
+        runCatching { webSocket?.send(jpeg.toByteString()) }
     }
 }
 

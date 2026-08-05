@@ -11,6 +11,9 @@ package com.bhoomibot.os.data
 import com.bhoomibot.os.model.DriveCommand
 import com.bhoomibot.os.model.RobotStatus
 import com.bhoomibot.os.repository.RobotRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /** In-memory transport placeholder.
  *  Right now every command is a no-op (does nothing) and status always returns default values.
@@ -18,6 +21,13 @@ import com.bhoomibot.os.repository.RobotRepository
 class LocalRobotRepository : RobotRepository {
     // Returns the default status object (robot appears online at 85% battery, Manual mode, etc.).
     override fun status() = RobotStatus()
+
+    private val _isConnected = MutableStateFlow(true) // Local/fake is always "connected"
+    override val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
+
+    private val _rpmData = MutableStateFlow(Pair(0, 0))
+    override val rpmData: StateFlow<Pair<Int, Int>> = _rpmData.asStateFlow()
+
     // No-op: would send a drive command to the robot over the real transport.
     override fun sendDriveCommand(command: DriveCommand) = Unit
     // No-op: would set the robot's speed.

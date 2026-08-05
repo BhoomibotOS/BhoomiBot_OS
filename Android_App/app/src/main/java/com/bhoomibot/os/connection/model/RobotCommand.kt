@@ -11,9 +11,10 @@ data class RobotCommand(
     // "leave the current setting unchanged", true/false explicitly toggle it.
     val pto: Boolean? = null,
     val lights: Boolean? = null,
-    // liveCamera is the operator's remote "live camera" switch: true tells the
-    // robot to START broadcasting its camera, false tells it to STOP. null means
-    // "leave the broadcast state unchanged". Stopping keeps the relay connection
-    // alive; only the frame/telemetry stream stops.
-    val liveCamera: Boolean? = null
+    // liveCamera is the operator's remote "live camera" switch.
+    val liveCamera: Boolean? = null,
+    // learningMode is the operator's remote "record/learn" switch.
+    val learningMode: Boolean? = null,
+    // useRearCamera: true = use back (rear) camera, false = use front camera, null = no change
+    val useRearCamera: Boolean? = null
 )

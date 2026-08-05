@@ -11,6 +11,7 @@ import com.bhoomibot.os.connection.protocol.LivePayloads
 import com.bhoomibot.os.connection.transport.LiveConnectionState
 import com.bhoomibot.os.connection.transport.LiveLinkClient
 import com.bhoomibot.os.connection.transport.WebSocketLiveLinkClient
+import android.util.Base64
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -32,40 +33,41 @@ import kotlinx.coroutines.launch
  */
 class LiveLinkRepositoryImpl(
     private val client: LiveLinkClient = WebSocketLiveLinkClient(ConnectionConfig()),
-    // Production uses a self-owned background scope. Tests pass runTest's scope so they can
-    // advance the collector deterministically instead of racing a real Dispatchers.Default thread.
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 ) : LiveLinkRepository {
 
     private val _peerStatus = MutableStateFlow(PeerStatus())
     private val _telemetry = MutableStateFlow(TelemetrySnapshot())
     private val _incomingCommands = MutableSharedFlow<RobotCommand>(extraBufferCapacity = 64)
+    private val _frames = MutableSharedFlow<LiveFrame>(extraBufferCapacity = 64)
+    private val _alerts = MutableSharedFlow<Pair<String, String>>(extraBufferCapacity = 8)
     private var currentRobotId: String = ""
+    private var currentServerUrl: String? = null
 
     override val connectionState: kotlinx.coroutines.flow.StateFlow<LiveConnectionState> = client.connectionState
     override val connectionError: kotlinx.coroutines.flow.StateFlow<String?> = client.lastError
-    override val frames: Flow<LiveFrame> = client.frames
+    override val frames: Flow<LiveFrame> = _frames.asSharedFlow()
     override val peerStatus: kotlinx.coroutines.flow.StateFlow<PeerStatus> = _peerStatus.asStateFlow()
     override val telemetry: kotlinx.coroutines.flow.StateFlow<TelemetrySnapshot> = _telemetry.asStateFlow()
     override val incomingCommands: Flow<RobotCommand> = _incomingCommands.asSharedFlow()
+    override val alerts: Flow<Pair<String, String>> = _alerts.asSharedFlow()
+
+    init {
+        // AI-Fix: Merged Frame Logic. We must collect from both binary and JSON paths.
+        scope.launch {
+            client.frames.collect { binaryFrame ->
+                _frames.emit(binaryFrame)
+            }
+        }
+    }
 
     override fun connect(config: ConnectionConfig) {
-        android.util.Log.d(
-            "BhoomiBotRelay",
-            "[PIPELINE] LiveLinkRepositoryImpl.connect() ENTERED config=serverUrl='${config.serverUrl}' robotId='${config.robotId}' session='${config.sessionCode}' role=${config.role}"
-        )
-        currentRobotId = config.robotId // remembered so outbound envelopes can be stamped
-        // Restart the fan-out collector for this session (cancel any previous one).
+        currentRobotId = config.robotId 
+        currentServerUrl = config.serverUrl
+
         collectorJob?.cancel()
         collectorJob = scope.launch {
-            // Single inbound stream of JSON envelopes -> demultiplex by type into the
-            // right role-specific flow. Anything unrecognized (HELLO, PING, ERROR...)
-            // is ignored here via the `else` branch. Undecodable payloads are dropped.
             client.messages.collect { env ->
-                android.util.Log.d(
-                    "BhoomiBotRelay",
-                    "[PIPELINE] received envelope type=${env.type} robotId=${env.robotId}"
-                )
                 when (LiveMessageType.from(env.type)) {
                     LiveMessageType.TELEMETRY ->
                         LivePayloads.decodeTelemetry(env.payload)?.let { _telemetry.value = it }
@@ -73,16 +75,20 @@ class LiveLinkRepositoryImpl(
                         LivePayloads.decodePeerStatus(env.payload)?.let { _peerStatus.value = it }
                     LiveMessageType.COMMAND ->
                         LivePayloads.decodeCommand(env.payload)?.let { _incomingCommands.tryEmit(it) }
+                    LiveMessageType.ALERT ->
+                        LivePayloads.decodeAlert(env.payload)?.let { _alerts.tryEmit(it) }
+                    LiveMessageType.VIDEO_FRAME ->
+                        env.payload?.let { base64 ->
+                            // AI-Fix: Extract video from JSON for Render compatibility
+                            val jpeg = Base64.decode(base64, Base64.NO_WRAP)
+                            _frames.tryEmit(LiveFrame(jpeg, env.ts))
+                        }
                     else -> Unit
                 }
             }
         }
-        // Push the new config into the (reused) client, THEN open the socket. Order
-        // matters: updateConfig must land before connect() so HELLO uses this session.
-        android.util.Log.d("BhoomiBotRelay", "[PIPELINE] calling client.updateConfig() -> client.connect()")
         client.updateConfig(config)
         client.connect()
-        android.util.Log.d("BhoomiBotRelay", "[PIPELINE] LiveLinkRepositoryImpl.connect() COMPLETED")
     }
 
     override fun disconnect() {
@@ -93,7 +99,25 @@ class LiveLinkRepositoryImpl(
         _telemetry.value = TelemetrySnapshot()
     }
 
-    override fun publishFrame(jpeg: ByteArray) = client.sendFrame(jpeg)
+    override fun publishFrame(jpeg: ByteArray) {
+        val serverUrl = currentServerUrl ?: ""
+        // Use Base64-JSON for secure internet relays (Render/Cloud proxies)
+        if (serverUrl.startsWith("wss://") || serverUrl.contains("onrender.com")) {
+            val base64 = Base64.encodeToString(jpeg, Base64.NO_WRAP)
+            client.send(
+                LiveEnvelope(
+                    type = LiveMessageType.VIDEO_FRAME.code,
+                    robotId = currentRobotId,
+                    ts = System.currentTimeMillis(),
+                    payload = base64
+                )
+            )
+        } else {
+            // Hotspot Mode: Use high-speed raw binary
+            client.sendFrame(jpeg)
+        }
+    }
+
 
     override fun publishTelemetry(snapshot: TelemetrySnapshot) {
         client.send(
@@ -102,6 +126,17 @@ class LiveLinkRepositoryImpl(
                 robotId = currentRobotId,
                 ts = System.currentTimeMillis(),
                 payload = LivePayloads.encodeTelemetry(snapshot)
+            )
+        )
+    }
+
+    override fun publishAlert(message: String, severity: String) {
+        client.send(
+            LiveEnvelope(
+                type = LiveMessageType.ALERT.code,
+                robotId = currentRobotId,
+                ts = System.currentTimeMillis(),
+                payload = LivePayloads.encodeAlert(message, severity)
             )
         )
     }

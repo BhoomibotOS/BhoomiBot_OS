@@ -39,6 +39,9 @@ interface LiveLinkRepository {
     /** Inbound commands (robot consumes). */
     val incomingCommands: Flow<RobotCommand>
 
+    /** Inbound priority alerts / help requests (operator consumes). */
+    val alerts: Flow<Pair<String, String>>
+
     fun connect(config: ConnectionConfig)
     fun disconnect()
 
@@ -47,6 +50,9 @@ interface LiveLinkRepository {
 
     /** Robot side: push a telemetry snapshot to the network. */
     fun publishTelemetry(snapshot: TelemetrySnapshot)
+
+    /** Robot side: push an alert/assistance request. */
+    fun publishAlert(message: String, severity: String = "HIGH")
 
     /** Operator side: send a drive/aux command to the robot. */
     fun sendCommand(command: RobotCommand)

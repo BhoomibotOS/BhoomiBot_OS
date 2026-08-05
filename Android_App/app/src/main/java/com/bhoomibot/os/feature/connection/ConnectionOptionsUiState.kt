@@ -20,6 +20,8 @@ data class ConnectionOptionsUiState(
     val networkMode: PhoneNetworkMode = PhoneNetworkMode.INTERNET,
     val videoFps: Int = 12,
     val videoQuality: VideoQuality = VideoQuality.MEDIUM,
+    val localHubActive: Boolean = false,
+    val localIpAddress: String = "Unknown",
     val saved: Boolean = false,
     /** Recently used server URLs, most-recent-first, for quick selection. */
     val recentServerUrls: List<String> = emptyList()
@@ -36,7 +38,7 @@ data class ConnectionOptionsUiState(
     val isServerUrlValid: Boolean
         get() = isUsableWebSocketUrl(
             url = normalizedServerUrl,
-            allowInsecureLocalUrl = networkMode == PhoneNetworkMode.LOCAL_WIFI
+            allowInsecureLocalUrl = networkMode == PhoneNetworkMode.HOTSPOT
         )
 
     /** Keeps the field label aligned with the selected network mode. */
@@ -74,9 +76,10 @@ data class ConnectionOptionsUiState(
 
 /** Validates address shape only; the live screen still reports unreachable relay failures. */
 private fun isUsableWebSocketUrl(url: String, allowInsecureLocalUrl: Boolean): Boolean {
+    if (url.isBlank()) return false
     val uri = runCatching { URI(url.trim()) }.getOrNull() ?: return false
-    val permittedScheme = uri.scheme.equals("wss", ignoreCase = true) ||
-        (allowInsecureLocalUrl && uri.scheme.equals("ws", ignoreCase = true))
+    val permittedScheme = uri.scheme?.lowercase() == "wss" ||
+        (allowInsecureLocalUrl && uri.scheme?.lowercase() == "ws")
     return permittedScheme && !uri.host.isNullOrBlank()
 }
 

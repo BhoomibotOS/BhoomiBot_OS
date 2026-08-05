@@ -42,6 +42,7 @@ object LivePayloads {
         putOpt("pto", c.pto)
         putOpt("lights", c.lights)
         putOpt("liveCamera", c.liveCamera)
+        putOpt("useRearCamera", c.useRearCamera)
     }.toString()
 
     fun decodeCommand(json: String?): RobotCommand? = runCatching {
@@ -56,7 +57,8 @@ object LivePayloads {
             // isNull preserves the tri-state: JSON null -> null ("leave unchanged").
             pto = if (o.isNull("pto")) null else o.optBoolean("pto"),
             lights = if (o.isNull("lights")) null else o.optBoolean("lights"),
-            liveCamera = if (o.isNull("liveCamera")) null else o.optBoolean("liveCamera")
+            liveCamera = if (o.isNull("liveCamera")) null else o.optBoolean("liveCamera"),
+            useRearCamera = if (o.isNull("useRearCamera")) null else o.optBoolean("useRearCamera")
         )
     }.getOrNull()
 
@@ -71,5 +73,16 @@ object LivePayloads {
             robotOnline = o.optBoolean("robot", false),
             operatorOnline = o.optBoolean("operator", false)
         )
+    }.getOrNull()
+
+    fun encodeAlert(message: String, severity: String): String = JSONObject().apply {
+        put("message", message)
+        put("severity", severity)
+        put("timestamp", System.currentTimeMillis())
+    }.toString()
+
+    fun decodeAlert(json: String?): Pair<String, String>? = runCatching {
+        val o = JSONObject(json ?: return@runCatching null)
+        o.optString("message", "Unknown problem") to o.optString("severity", "LOW")
     }.getOrNull()
 }

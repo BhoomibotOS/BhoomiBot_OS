@@ -12,15 +12,12 @@ val keystoreProperties = Properties().apply {
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
     namespace = "com.bhoomibot.os"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.bhoomibot.os"
@@ -56,6 +53,20 @@ android {
     buildFeatures {
         compose = true
     }
+    androidResources {
+        noCompress("tflite")
+    }
+    packaging {
+        jniLibs {
+            // Android 16KB Page Alignment (Future-proofing for Android 15+)
+            // This ensures native libraries (like TensorFlow) are padded correctly
+            // to prevent crashes on high-performance 2025/2026 hardware.
+            useLegacyPackaging = false
+        }
+    }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -63,15 +74,20 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-service:2.8.7")
     // Live internet link (robot<->operator over WebSocket).
     implementation(libs.okhttp)
     testImplementation(libs.junit)
+    testImplementation(libs.androidx.junit)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.robolectric)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -88,4 +104,11 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.6.1")
     implementation("androidx.camera:camera-lifecycle:1.6.1")
     implementation("androidx.camera:camera-view:1.6.1")
+    implementation(libs.tensorflow.lite)
+    implementation(libs.tensorflow.lite.gpu)
+    implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.4")
+    implementation("org.java-websocket:Java-WebSocket:1.5.7")
+    implementation(libs.zxing.core)
+    implementation(libs.mlkit.barcode)
+    implementation(libs.mediapipe.genai)
 }

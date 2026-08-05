@@ -7,24 +7,27 @@ import com.bhoomibot.os.data.ConnectionPreferencesStore
 import com.bhoomibot.os.vcu.ConnectionManager
 import com.bhoomibot.os.vcu.ConnectionPreferences
 import com.bhoomibot.os.vcu.ConnectionType
+import com.bhoomibot.os.repository.provideRobotRepository
+import com.bhoomibot.os.service.BhoomiBotService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * Holds the editable [ConnectionPreferences] for the VCU connection (BT MAC, WiFi host/port,
- * mode, timeouts). Values live in memory while the screen is open and are persisted to DataStore
- * only when [save] is called, so a stray edit is never written until the operator confirms.
- *
- * Scope note: this configures the LOCAL VCU/ESP32 link (Bluetooth/WiFi hotspot), a different
- * "world" from the internet relay link handled by feature/connection/.
+ * Holds the editable [ConnectionPreferences] for the VCU connection.
  */
 class ConnectionSettingsViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val repository = provideRobotRepository(application)
+
     private val _prefs = MutableStateFlow(ConnectionPreferences())
     val prefs: StateFlow<ConnectionPreferences> = _prefs.asStateFlow()
+
+    private val _isConnected = MutableStateFlow(false)
+    val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
     // Result text of the last "Test connection" attempt; null until one is run.
     private val _testStatus = MutableStateFlow<String?>(null)
@@ -38,6 +41,11 @@ class ConnectionSettingsViewModel(application: Application) : AndroidViewModel(a
     init {
         viewModelScope.launch {
             _prefs.value = ConnectionPreferencesStore.preferences(application.applicationContext).first()
+        }
+        viewModelScope.launch {
+            repository.isConnected.collectLatest { connected ->
+                _isConnected.value = connected
+            }
         }
     }
 
@@ -59,29 +67,18 @@ class ConnectionSettingsViewModel(application: Application) : AndroidViewModel(a
         }
     }
 
-    // Attempts a real connection using the current (unsaved) preferences: opens the socket and
-    // sends a probe command, then reports success/failure with the underlying error message.
-    fun testConnection() {
+    // Triggers real-time CONNECT or DISCONNECT
+    fun toggleConnection() {
         viewModelScope.launch {
-            _isTesting.value = true
-            _testStatus.value = null
-            val result = runCatching {
-                val mgr = ConnectionManager(getApplication(), _prefs.value)
-                try {
-                    mgr.connect()
-                    mgr.send("T") // probe: forces the socket open and verifies the link
-                } finally {
-                    mgr.disconnect()
-                }
-            }
-            // The screen decides success by checking this text starts with "Connected", so keep that
-            // prefix if you change the message.
-            _testStatus.value = if (result.isSuccess) {
-                "Connected successfully"
+            if (_isConnected.value) {
+                repository.disconnect()
+                BhoomiBotService.stop(getApplication())
             } else {
-                "Failed: ${result.exceptionOrNull()?.message ?: "unknown error"}"
+                // Save current edits first
+                ConnectionPreferencesStore.save(getApplication(), _prefs.value)
+                BhoomiBotService.start(getApplication())
+                repository.sendDriveCommand(com.bhoomibot.os.model.DriveCommand.STOP)
             }
-            _isTesting.value = false
         }
     }
 }

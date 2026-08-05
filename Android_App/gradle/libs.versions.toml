@@ -11,6 +11,13 @@ composeBom = "2026.02.01"
 okhttp = "4.12.0"
 coroutines = "1.10.1"
 orgjson = "20240303"
+kotlinxSerialization = "1.8.0"
+robolectric = "4.11.1"
+tensorflowLite = "2.16.1"
+javaWebSocket = "1.5.7"
+zxing = "3.5.3"
+mlkitBarcode = "17.3.0"
+mediapipeGenai = "0.10.14"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -28,12 +35,23 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+androidx-test-core = { group = "androidx.test", name = "core", version = "1.5.0" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 # Provided by Android at runtime; added only for the JVM unit-test classpath.
 orgjson = { group = "org.json", name = "json", version.ref = "orgjson" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+tensorflow-lite = { group = "org.tensorflow", name = "tensorflow-lite", version.ref = "tensorflowLite" }
+tensorflow-lite-gpu = { group = "org.tensorflow", name = "tensorflow-lite-gpu", version.ref = "tensorflowLite" }
+tensorflow-lite-taskvision = { group = "org.tensorflow", name = "tensorflow-lite-task-vision", version = "0.4.4" }
+jwebsocket = { group = "org.java-websocket", name = "Java-WebSocket", version.ref = "javaWebSocket" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+mlkit-barcode = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcode" }
+mediapipe-genai = { group = "com.google.mediapipe", name = "tasks-genai", version.ref = "mediapipeGenai" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 

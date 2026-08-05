@@ -1,0 +1,436 @@
+# Agri Robot — Module-Wise Prompts for Claude Code
+(Updated for actual hardware: Bluetooth link to ESP32/VCU, DAC pins 25/26, Eriksha analog motor controllers, differential/skid steering, no reverse pin)
+
+Paste the **Master Prompt** once at the start of a Claude Code session. Then paste each module's prompt **one at a time**, in order, only moving to the next after the current one is implemented and its tests pass.
+
+---
+
+## Master Prompt (paste first)
+
+```
+You are acting as a senior embedded/mobile systems engineer implementing a
+production-grade autonomous agricultural robot, being built incrementally
+module by module. I will give you one module at a time.
+
+Hardware context (fixed for all modules):
+- ESP32 acts as the VCU (vehicle control unit): low-level motor/hardware control.
+- Robot Android phone talks to the ESP32 over Bluetooth (Classic or BLE —
+  confirm which; Bluetooth Classic SPP is already working for the operator
+  phone's direct link to the ESP32, reuse that pattern).
+- Operator Android phone talks to the Robot phone over WebSocket (already working).
+- Drivetrain: 4 wheels, 2 motors (skid-steer). Left motor drives front-left +
+  rear-left wheels. Right motor drives right-side wheels.
+- Motors are Eriksha (e-rickshaw style) motors with controllers that accept an
+  ANALOG throttle signal — unidirectional (0 = stop, increasing = more speed),
+  no reverse on this signal. Steering is achieved purely by reducing the
+  analog value on one side relative to the other.
+- ESP32 outputs the analog signal via its onboard DAC: GPIO25 = left motor,
+  GPIO26 = right motor. DAC is 8-bit (0-255), 0-3.3V range. NOTE: confirm
+  whether the motor controller's throttle spec needs more than 3.3V for full
+  speed (many e-rickshaw controllers run ~1-4.3V on a 5V reference) — if so,
+  flag that a voltage-scaling stage (op-amp, gain ~1.3x) is needed between the
+  ESP32 DAC and the controller, don't silently assume 3.3V is enough.
+- Motors are NOT identical — calibration is per-motor (left and right will
+  have different deadband/start thresholds).
+
+Global rules for every module:
+1. Follow the exact data schemas and state machine given — do not invent
+   alternate field names or restructure without flagging it to me first.
+2. Every module must be independently testable — include unit/instrumented
+   tests as part of the deliverable, not as an afterthought.
+3. Safety-critical logic (ESP32 watchdog, e-stop, confidence gating) must be
+   implemented defensively: assume the Bluetooth link, the phone, or a sensor
+   can fail at any time, and the robot must fail to a safe state (motors at
+   MOTOR_*_STOP), never a silent unsafe one.
+4. Keep modules loosely coupled: communicate through the defined interfaces
+   (state machine events, pose stream, message envelope) — no module should
+   reach into another's internals.
+5. This system will keep growing in later phases (vision, learning, fleet
+   management, voice control) — don't over-build for the future, but don't
+   paint us into a corner either. Flag any schema decision that would make a
+   known future phase harder.
+6. After implementing each module, summarize: what you built, what you
+   deliberately deferred, and what test coverage exists, so I can verify
+   before we move to the next module.
+
+Module order for this build:
+M1 (ESP32 firmware + motor calibration) -> M2 (robot phone state machine) ->
+M10 (Bluetooth/WebSocket comm layer) -> M3 (localization fusion) ->
+M4 (teach recorder) -> M6 (mission DB) -> M5 (mission processing) ->
+M7 (path replay) -> M9 (confidence/emergency) -> M11 (operator UI) ->
+M8 (vision) -> M12 (cloud sync).
+
+I'll paste the detailed spec for each module when we start it. Confirm you
+understand this workflow, then wait for Module M1's spec.
+```
+
+---
+
+## M1 — ESP32 Firmware (Motor Control + Calibration)
+
+```
+Implement ESP32 firmware (PlatformIO or Arduino, C++) with these exact requirements:
+
+COMMAND INTERFACE (received over Bluetooth Classic SPP as JSON lines):
+{
+  "seq": 10234,
+  "cmd": "DRIVE",
+  "left_norm": 0.65,     // normalized 0.0-1.0, forward-only
+  "right_norm": 0.40,    // normalized 0.0-1.0, forward-only
+  "watchdog_ms": 300
+}
+cmd enum: DRIVE, STOP, ESTOP, PING.
+
+WATCHDOG: if no new command arrives within watchdog_ms of the last one, the
+firmware must independently ramp both motors to MOTOR_*_STOP, with no
+dependency on the Bluetooth stack noticing the disconnect. This must work even
+if the main loop is blocked elsewhere — use a hardware timer interrupt, not a
+loop-counter.
+
+MOTOR OUTPUT: use the ESP32's onboard DAC — dacWrite(25, value) for left,
+dacWrite(26, value) for right. Do NOT use ledcWrite/PWM for this — the
+existing hardware expects a true analog DAC voltage.
+
+CALIBRATION CONSTANTS (store in a config struct, adjustable via a CALIBRATE
+command over Bluetooth, not hardcoded only — I will be tuning these by hand):
+  MOTOR_LEFT_STOP, MOTOR_LEFT_MIN_START, MOTOR_LEFT_MAX_SAFE
+  MOTOR_RIGHT_STOP, MOTOR_RIGHT_MIN_START, MOTOR_RIGHT_MAX_SAFE
+
+MAPPING: convert incoming left_norm/right_norm (0.0-1.0) to actual DAC values
+using deadband compensation, NOT linear 0-255 scaling:
+  dac = (norm <= 0.0) ? MOTOR_STOP : MOTOR_MIN_START + norm * (MOTOR_MAX_SAFE - MOTOR_MIN_START)
+
+BOOT SAFETY: on power-up, hold both DAC outputs at MOTOR_*_STOP before
+accepting any commands — some e-rickshaw controllers refuse to start or fault
+if throttle is already above threshold at power-on.
+
+TELEMETRY (sent back over Bluetooth at ~10Hz):
+{
+  "seq": 10234,
+  "wheel_odom": {"left_m": 12.41, "right_m": 12.38},
+  "imu": {"ax":0,"ay":0,"az":9.81,"gx":0,"gy":0,"gz":0},
+  "battery_v": 24.8,
+  "fault_flags": []
+}
+
+E-STOP: implement a hardware-interrupt-driven physical e-stop that bypasses
+the main loop and command parsing entirely — must work even if Bluetooth or
+firmware logic hangs.
+
+CALIBRATION MODE: implement a CALIBRATE command that, on request, sweeps a
+named motor (left or right) from 0 upward in configurable step size, holding
+each step for a configurable dwell time, and reports the current DAC value
+back every step over Bluetooth so I can visually confirm from the operator
+app when the wheel starts turning and mark that as MIN_START. Wheels will be
+off the ground during this — no special safety interlock needed for the sweep
+itself beyond the existing watchdog/e-stop.
+
+Provide unit tests (with a mocked Bluetooth/serial interface) for: the
+watchdog timeout firing and zeroing both motors, the deadband mapping
+function across the full 0.0-1.0 input range, and boot-safety (DAC held at
+STOP before first valid command).
+```
+
+---
+
+## M2 — Robot Phone Core Service (State Machine)
+
+```
+Implement an Android foreground service in Kotlin hosting this state machine
+as an explicit sealed-class FSM (no external FSM library, for auditability):
+
+IDLE -> TEACHING -> PROCESSING -> READY -> LOCALIZING -> EXECUTING
+EXECUTING -> PAUSED_LOW_CONFIDENCE(reason) -> AWAITING_OPERATOR
+EXECUTING -> PAUSED_OBSTACLE(reason) -> AWAITING_OPERATOR
+EXECUTING -> COMPLETE -> READY
+AWAITING_OPERATOR -> RESUMING -> EXECUTING
+AWAITING_OPERATOR -> REMOTE_CONTROL -> EXECUTING | ABORTED
+AWAITING_OPERATOR -> DETOUR_PLANNING -> EXECUTING
+AWAITING_OPERATOR -> ABORTED -> RETURNING_HOME -> IDLE
+ANY_STATE -> ESTOP -> IDLE (requires explicit operator clear)
+
+Requirements:
+- Expose current state via a Kotlin Flow for other in-process modules to observe.
+- Expose requestTransition(event) and getCurrentState() via a local Binder API.
+- Every transition must be persisted to an append-only state_transitions table:
+  {id, from_state, to_state, reason, triggering_module, timestamp}.
+- Illegal transitions must be rejected (return an error, do not silently no-op).
+- This service owns the decision of WHAT drive command intent to send, but the
+  actual Bluetooth transmission to the ESP32 (M1) goes through the comm layer
+  (M10) — do not embed Bluetooth code directly in this module.
+
+Write unit tests enumerating every legal transition and asserting every
+illegal transition is rejected. Include a fuzz test with randomized event
+sequences confirming no illegal state is ever reachable.
+```
+
+---
+
+## M10 — Communication Layer (Bluetooth to ESP32 + WebSocket to Operator)
+
+```
+Implement two communication clients in Kotlin:
+
+(A) Bluetooth client (robot phone -> ESP32/VCU): reuse the existing working
+Bluetooth Classic SPP connection pattern already used for the operator
+phone's direct link to the ESP32. Send DRIVE/STOP/ESTOP/PING JSON commands
+per the M1 schema (left_norm, right_norm, watchdog_ms), and parse incoming
+telemetry JSON at ~10Hz. Implement automatic reconnect with backoff if the
+Bluetooth link drops — but do NOT treat a dropped link as a mission-pausing
+event by itself; that decision belongs to M9, not this module. This module's
+only job is: keep sending the current commanded drive intent at a steady
+rate, and surface link-health status to whoever asks.
+
+(B) WebSocket client (robot phone <-> operator phone): implement using this
+message envelope:
+{
+  "msg_id": "uuid",
+  "type": "TELEMETRY | STATE_CHANGE | EMERGENCY_ALERT | OPERATOR_COMMAND | MISSION_SYNC | ACK",
+  "timestamp": 0,
+  "payload": {}
+}
+Require ACK for OPERATOR_COMMAND and EMERGENCY_ALERT messages specifically;
+implement exponential-backoff resend for EMERGENCY_ALERT until acked (this is
+the highest-stakes message type in the system). Make message handling
+idempotent via msg_id (duplicate delivery must not double-apply an effect).
+Implement reconnect-resume via a last-seen-msg_id cursor rather than
+resending full state.
+
+Write tests for: (A) Bluetooth reconnect after simulated drop while confirming
+last commanded drive intent keeps being sent once reconnected; (B) WebSocket
+disconnect-during-mission not itself causing any state change, out-of-order
+delivery, and duplicate delivery via msg_id.
+```
+
+---
+
+## M3 — Sensor Fusion / Localization Engine
+
+```
+Implement an Extended Kalman Filter (EKF) pose fusion module in Kotlin (or a
+native module if performance requires) fusing GPS/RTK fixes, IMU frames
+(from M1 telemetry), and wheel odometry deltas (from M1 telemetry) at their
+native rates, publishing a fused pose at 10Hz:
+{
+  "timestamp": 0,
+  "lat": 0, "lon": 0, "heading_deg": 0, "speed_mps": 0,
+  "confidence": 0.0,
+  "source_flags": ["gps","imu","odom"]
+}
+Define and document the confidence scoring function explicitly (e.g. derived
+from filter covariance trace, normalized 0-1) — this number is the single
+input M9 will gate on later, so it must be principled, not a placeholder.
+
+Provide a replay harness: given a recorded sensor log (CSV/JSON), output the
+fused pose track and confidence-over-time for offline validation, including a
+test case simulating a GPS dropout mid-log and confirming confidence drops
+appropriately and pose error stays bounded during the dropout.
+```
+
+---
+
+## M4 — Teach Mode Recorder
+
+```
+Implement a Teach Mode recording module in Kotlin subscribing to the M3 pose
+stream, M1 telemetry (via M10), and camera frame capture (2Hz), writing ticks
+(~10-20Hz) to a local append-only Room DB table:
+{
+  "t": 0,
+  "pose": {"lat":0,"lon":0,"heading":0,"confidence":0},
+  "imu": {}, "wheel_odom": {},
+  "camera_frame_ref": "frame_00231.jpg",
+  "motor_cmd": {"left_norm":0,"right_norm":0},
+  "operator_marker": null
+}
+operator_marker is null on most ticks; populated with "START", "END",
+"WAYPOINT", "HAZARD", or free text when the operator explicitly taps a marker
+button. Do NOT attempt automatic action detection in this phase — explicit
+markers only.
+
+The recording must survive process death: persist incrementally as ticks
+arrive, not only when Finish is pressed. Provide an event bus/API so the UI
+(M11) can trigger a marker write mid-recording.
+
+Write tests for: no dropped ticks over a 5-minute simulated recording, markers
+landing on the correct tick, and recovery of a partial recording after a
+simulated process kill mid-session.
+```
+
+---
+
+## M6 — Mission Store (Local Database)
+
+```
+Implement a Room/SQLite database with these tables:
+
+missions: mission_id (PK), name, version, parent_mission_id (nullable),
+field_id, start_pose (JSON), end_pose (JSON), waypoints (JSON array of
+{lat,lon,heading,target_speed_left_norm,target_speed_right_norm,confidence,
+ref_frame}), safety_zones (JSON), no_go_zones (JSON), return_path (JSON
+nullable), implement_config (JSON), terrain_type, ai_notes, operator_notes,
+created_at, updated_at, sync_state (LOCAL_ONLY/SYNCED/CONFLICT).
+
+recordings: recording_id (PK), mission_id (nullable), tick_data_path (file
+path to JSONL tick log — do not store ticks as DB rows), status
+(RECORDING/COMPLETE/PROCESSED/DISCARDED), created_at.
+
+state_transitions: id, from_state, to_state, reason, triggering_module, timestamp.
+
+emergency_events: id, mission_id, timestamp, reason, confidence_at_trigger,
+operator_action, resolution_time_ms.
+
+Provide DAOs for CRUD plus a sync_state update path for later cloud sync use.
+Write instrumented tests for concurrent read/write (recorder writing while UI
+lists missions) and a schema migration test (bump version, verify no data loss).
+```
+
+---
+
+## M5 — Mission Processing Pipeline
+
+```
+Implement a mission-processing pipeline in Kotlin as pure functions (no
+Android framework dependencies, so it's fully unit-testable offline) that
+takes a raw recording (M4 schema) and produces a Mission object (M6 schema):
+
+1. Trim to START/END markers.
+2. Simplify the path (implement Douglas-Peucker or equivalent) to reduce
+   waypoint count while preserving shape within a configurable tolerance.
+3. Smooth left_norm/right_norm command history (remove operator jitter) via
+   moving-average or spline fit.
+4. Compute per-segment target left_norm/right_norm (median of recorded
+   values in that segment, clipped to safe bounds).
+5. Attach the nearest reference camera frame to each waypoint.
+6. Flag segments where recorded pose confidence was below a threshold as
+   "low_confidence" zones in ai_notes.
+7. Emit a versioned Mission object.
+
+Write a test suite with synthetic recordings covering: a straight path, an
+S-curve, and a recording with a simulated GPS dropout in the middle —
+asserting output waypoint count, smoothness, and confidence flags match
+expectations.
+```
+
+---
+
+## M7 — Path Replay / Execution Engine
+
+```
+Implement a pure-pursuit path-following module in Kotlin that takes a
+Mission's waypoint list and the current fused pose (M3) and outputs a drive
+command each tick as {left_norm, right_norm} — NOT a linear/angular velocity
+pair, since our drivetrain is differential-analog-per-side, not a standard
+diff-drive velocity model:
+
+1. Find the lookahead waypoint ahead of current pose on the mission path.
+2. Compute the heading correction needed to reach it.
+3. Convert heading correction into a left/right differential: reduce
+   left_norm to turn left, reduce right_norm to turn right (matches the
+   physical steering method — steering is achieved by slowing one side, not
+   by reversing it).
+4. Clip both values to the waypoint's target speed and any safety-zone caps.
+5. Before emitting, check M9's confidence gate — if confidence is too low,
+   emit a PAUSE request instead of a drive command.
+
+Build a lightweight 2D kinematic simulator (pure Kotlin, no Android deps)
+modeling this differential-analog steering (not a generic bicycle model) to
+closed-loop test path convergence on straight, curved, and S-shaped synthetic
+missions.
+```
+
+---
+
+## M9 — Confidence Monitor & Emergency Handler
+
+```
+Implement a confidence-gate module in Kotlin subscribing to:
+- M3 pose confidence
+- M8 detection output (once available; stub it for now with a
+  fixed-confidence mock)
+- M1 fault_flags and battery_v (via M10 telemetry)
+- M10 Bluetooth link health
+
+Apply configurable thresholds with hysteresis/duration windows (to avoid
+flapping) to decide when to request a PAUSE transition from M2. On trigger,
+assemble:
+{
+  "timestamp": 0,
+  "trigger": "LOW_LOCALIZATION_CONFIDENCE",
+  "confidence": 0.41, "threshold": 0.6, "duration_below_threshold_ms": 2200,
+  "suggested_actions": ["RETRY_LOCALIZATION","REQUEST_REMOTE_CONTROL","SKIP_WAYPOINT"]
+}
+and hand it to M10 for delivery as an EMERGENCY_ALERT.
+
+IMPORTANT: Bluetooth link loss to the ESP32 must NOT by itself trigger a
+pause — M1's onboard watchdog already handles that failure mode safely at the
+hardware level; this module reacting redundantly would just create confusing
+double-handling. WebSocket loss to the operator similarly must not pause the
+robot — it only affects alert delivery and remote-command availability.
+
+Write tests injecting each fault type synthetically (low confidence, fault
+flag, low battery) and verifying correct transition + correct alert payload
+for each, plus an explicit test that Bluetooth/WebSocket loss alone never
+triggers a pause.
+```
+
+---
+
+## M11 — Operator App (UI)
+
+```
+Implement the Operator Android app UI (Jetpack Compose) with these screens,
+wired to the M10 WebSocket client:
+1. Live status: connection, battery, current state, live camera thumbnail.
+2. Teach Mission: Start/Pause/Resume/Finish recording, marker buttons
+   (START/END/WAYPOINT/HAZARD).
+3. Mission List: list/rename/delete/replay-select, reading from the locally
+   synced mirror of M6 data.
+4. Emergency Alert: full-screen interrupt showing image, reason, confidence,
+   and the suggested_actions buttons from M9's payload — must be able to
+   interrupt/overlay any other screen immediately on receipt of an
+   EMERGENCY_ALERT message.
+5. Remote Control: simple directional control, only reachable from
+   AWAITING_OPERATOR or explicit override.
+6. Mission Progress: progress %, confidence indicator, localization status.
+7. Calibration screen: send the CALIBRATE command to a chosen motor (left or
+   right), display the live DAC sweep value as it's reported back from the
+   ESP32 (via M1's calibration mode), and let me tap "Motor started here" to
+   record MOTOR_*_MIN_START, and "Max reached" to record MOTOR_*_MAX_SAFE.
+
+Include UI tests for the emergency-interrupt behavior and the calibration
+screen's start/max capture flow.
+```
+
+---
+
+## M8 — Perception Pipeline (Vision, Phase 1 subset)
+
+```
+Implement an on-device object detection module (recommend a mobile-optimized
+quantized model, e.g. YOLO variant via TFLite) running on the robot phone
+camera feed, detecting humans and generic obstacles in the robot's path,
+publishing at minimum 5Hz:
+{
+  "timestamp": 0, "obstacle_detected": true, "obstacle_class": "human",
+  "bbox": [0,0,0,0], "distance_estimate_m": 0, "detection_confidence": 0.0
+}
+Prioritize recall over precision specifically for the "human" class — a
+missed human is unacceptable, a false positive just causes an extra pause.
+Provide an evaluation script against a labeled video test set reporting
+precision/recall, with special attention to the human-class recall number.
+```
+
+---
+
+## M12 — Cloud Sync Service
+
+```
+Implement a background sync service (WorkManager) that uploads any
+LOCAL_ONLY mission/recording rows from M6 to [cloud backend — specify
+Firebase/S3/custom API] when connectivity is available, and downloads any
+remote missions not present locally. On conflicting edits (same mission
+edited in two places), never overwrite — create a new version linked via
+parent_mission_id. Write tests for offline queuing and conflict-as-new-version
+behavior.
+```

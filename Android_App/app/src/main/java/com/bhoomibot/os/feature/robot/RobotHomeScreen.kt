@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.SmartToy
@@ -57,6 +58,7 @@ fun RobotHomeScreen(navController: NavController) {
     // Robot-only actions. Logs/Developer/Maintenance open the generic RobotSection detail screen.
     val actions = listOf(
         RobotAction("Settings", Icons.Default.Settings, "VCU connection and live-link options", AppRoute.RobotSettings),
+        RobotAction("Skill Library", Icons.Default.PlaylistPlay, "Manage & replay validated skills", AppRoute.SkillLibrary),
         RobotAction("AI & Vision", Icons.Default.CameraAlt, "AI inference + live perception", AppRoute.Camera),
         RobotAction("Diagnostics", Icons.Default.Analytics, "Subsystem health + faults", AppRoute.Diagnostics),
         RobotAction("Logs", Icons.Default.ReceiptLong, "System event log", AppRoute.robotSection("Logs", "System event log")),

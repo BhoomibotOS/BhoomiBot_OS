@@ -1,6 +1,7 @@
 package com.bhoomibot.os.feature.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,7 +9,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -21,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,9 +34,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -56,25 +64,21 @@ fun ConnectionSettingsScreen(
     viewModel: ConnectionSettingsViewModel = viewModel()
 ) {
     val prefs by viewModel.prefs.collectAsState()
-    val testStatus by viewModel.testStatus.collectAsState()
-    val isTesting by viewModel.isTesting.collectAsState()
+    val isConnected by viewModel.isConnected.collectAsState()
+    
     // True when the selected mode needs the Bluetooth MAC and/or the WiFi host+port.
     val needsBluetooth = prefs.connectionType != ConnectionType.WIFI_HOTSPOT
     val needsWifi = prefs.connectionType != ConnectionType.BLUETOOTH
 
     val context = LocalContext.current
-    // Launches the Bluetooth permission dialog and (re)starts the connection test once answered.
+    // Launches the Bluetooth permission dialog.
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
         if (results.values.all { it }) {
-            viewModel.testConnection()
+            viewModel.toggleConnection()
         } else {
-            Toast.makeText(
-                context,
-                "Bluetooth permissions are required to test the connection.",
-                Toast.LENGTH_SHORT
-            ).show()
+            Toast.makeText(context, "Permissions required", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -170,57 +174,52 @@ fun ConnectionSettingsScreen(
                 }
             }
             Spacer(Modifier.height(12.dp))
-            // Test the current settings against the ESP32 without saving them.
+            // Active Connection Control
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("TEST CONNECTION", fontWeight = FontWeight.ExtraBold)
-                    Text("Verify the ESP32 is reachable with the settings above. Nothing is saved.", color = MutedText, style = MaterialTheme.typography.bodySmall)
+                    Text("HARDWARE LINK", fontWeight = FontWeight.ExtraBold)
+                    Text("Establish a live connection to the robot hardware.", color = MutedText, style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(12.dp))
                     Button(
                         onClick = {
                             // Permission handling (Android 12+)
                             val missing = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                                 mutableListOf<String>().apply {
-                                    if (ContextCompat.checkSelfPermission(
-                                            context,
-                                            android.Manifest.permission.BLUETOOTH_CONNECT
-                                        ) != PackageManager.PERMISSION_GRANTED
-                                    ) {
-                                        add(android.Manifest.permission.BLUETOOTH_CONNECT)
-                                    }
-                                    if (ContextCompat.checkSelfPermission(
-                                            context,
-                                            android.Manifest.permission.BLUETOOTH_SCAN
-                                        ) != PackageManager.PERMISSION_GRANTED
-                                    ) {
-                                        add(android.Manifest.permission.BLUETOOTH_SCAN)
-                                    }
+                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) add(Manifest.permission.BLUETOOTH_CONNECT)
+                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) add(Manifest.permission.BLUETOOTH_SCAN)
                                 }
-                            } else {
-                                mutableListOf()
-                            }
-                            if (missing.isNotEmpty()) {
-                                // Launch the system permission dialog for missing permissions.
-                                permissionLauncher.launch(missing.toTypedArray())
-                            } else {
-                                // All required permissions are already granted – run the test.
-                                viewModel.testConnection()
-                            }
+                            } else { mutableListOf() }
+
+                            if (missing.isNotEmpty()) permissionLauncher.launch(missing.toTypedArray())
+                            else viewModel.toggleConnection()
                         },
-                        enabled = !isTesting,
-                        modifier = Modifier.fillMaxWidth().height(46.dp),
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondary,
-                            contentColor = MaterialTheme.colorScheme.onSecondary
+                            containerColor = if (isConnected) SafetyRed else SignalGreen,
+                            contentColor = Color.White
                         )
-                    ) { Text(if (isTesting) "TESTING…" else "TEST CONNECTION", fontWeight = FontWeight.Bold) }
-                    // Shows the outcome of the last test (green = success, red = failure).
-                    testStatus?.let { status ->
-                        Spacer(Modifier.height(10.dp))
-                        // Success is inferred from the VM's status text (it emits "Connected…" on success);
-                        // keep this prefix in sync with ConnectionSettingsViewModel.testConnection().
-                        val success = status.startsWith("Connected")
-                        Text(status, color = if (success) SignalGreen else SafetyRed, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    ) { 
+                        Text(
+                            if (isConnected) "DISCONNECT" else "CONNECT", 
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
+                        ) 
+                    }
+                    
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape, 
+                            color = if (isConnected) SignalGreen else MutedText, 
+                            modifier = Modifier.size(8.dp)
+                        ) {}
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (isConnected) "Robot is ONLINE" else "Robot is OFFLINE", 
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isConnected) SignalGreen else MutedText
+                        )
                     }
                 }
             }

@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bhoomibot.os.connection.model.ConnectionConfig
 import com.bhoomibot.os.connection.model.VideoQuality
+import com.bhoomibot.os.connection.transport.local.LocalHubManager
 import com.bhoomibot.os.data.DevicePreferences
 import com.bhoomibot.os.data.LiveLinkPreferences
 import com.bhoomibot.os.data.LiveLinkPreferencesStore
@@ -12,27 +13,25 @@ import com.bhoomibot.os.model.DeviceRole
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Holds the editable live-link config (server URL, Robot ID, session code,
- * video quality, auto-reconnect). Loads the saved values on start and persists
- * them via [LiveLinkPreferencesStore] when [save] is called — mirroring the
- * existing [com.bhoomibot.os.feature.settings.ConnectionSettingsViewModel].
+ * Holds the editable live-link config.
  */
 class ConnectionOptionsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(ConnectionOptionsUiState())
     val uiState: StateFlow<ConnectionOptionsUiState> = _uiState.asStateFlow()
 
-    // Load the saved live-link preferences (and the onboarding role) once, when created.
-    // Enums are stored as their String name(); runCatching { valueOf(...) }.getOrDefault(...)
-    // falls back safely if a stored value is missing or from an older/renamed enum.
     init {
         viewModelScope.launch {
             val prefs = LiveLinkPreferencesStore.preferences(getApplication()).first()
             val role = DevicePreferences.role(application).first() ?: DeviceRole.OPERATOR
+            
+            // Start with current local hub state to avoid race condition
             _uiState.value = ConnectionOptionsUiState(
                 role = role,
                 serverUrl = prefs.serverUrl,
@@ -44,8 +43,22 @@ class ConnectionOptionsViewModel(application: Application) : AndroidViewModel(ap
                 videoFps = prefs.videoFps,
                 videoQuality = runCatching { VideoQuality.valueOf(prefs.videoQuality) }
                     .getOrDefault(VideoQuality.MEDIUM),
-                recentServerUrls = prefs.recentServerUrls
+                recentServerUrls = prefs.recentServerUrls,
+                localHubActive = LocalHubManager.isServerRunning.value,
+                localIpAddress = LocalHubManager.localIpAddress.value
             )
+        }
+
+        // Collect Local Hub state
+        viewModelScope.launch {
+            LocalHubManager.isServerRunning.collectLatest { running ->
+                _uiState.value = _uiState.value.copy(localHubActive = running)
+            }
+        }
+        viewModelScope.launch {
+            LocalHubManager.localIpAddress.collectLatest { ip ->
+                _uiState.value = _uiState.value.copy(localIpAddress = ip)
+            }
         }
     }
 
@@ -59,6 +72,46 @@ class ConnectionOptionsViewModel(application: Application) : AndroidViewModel(ap
     fun setNetworkMode(v: PhoneNetworkMode) { _uiState.value = _uiState.value.copy(networkMode = v, saved = false) }
     fun setVideoFps(v: Int) { _uiState.value = _uiState.value.copy(videoFps = v.coerceIn(1, 30)) }
     fun setVideoQuality(q: VideoQuality) { _uiState.value = _uiState.value.copy(videoQuality = q) }
+
+    /** Generates a compact string for QR pairing. */
+    fun getPairingData(): String {
+        val s = _uiState.value
+        val ip = LocalHubManager.localIpAddress.value
+        return "BHOOMI_V1|$ip|${s.robotId}|${s.sessionCode}"
+    }
+
+    /** Decodes a QR code and fills the fields. */
+    fun processScannedData(data: String) {
+        if (!data.startsWith("BHOOMI_V1|")) return
+        val parts = data.split("|")
+        if (parts.size < 4) return
+        
+        val ip = parts[1]
+        val robotId = parts[2]
+        val session = parts[3]
+        
+        _uiState.update { it.copy(
+            serverUrl = "ws://$ip:8080",
+            robotId = robotId,
+            sessionCode = session
+        ) }
+    }
+
+    /** Toggles the local hub server on the Robot Phone */
+    fun toggleLocalHub() {
+        val currentlyActive = _uiState.value.localHubActive
+        android.util.Log.d("LocalHub", "Toggling Hub. Current state: $currentlyActive")
+        if (currentlyActive) {
+            LocalHubManager.stopServer()
+            _uiState.value = _uiState.value.copy(localHubActive = false)
+        } else {
+            android.util.Log.d("LocalHub", "Starting server...")
+            LocalHubManager.startServer(getApplication())
+            // Suggest the local URL immediately
+            setServerUrl("ws://localhost:8080")
+            _uiState.value = _uiState.value.copy(localHubActive = true)
+        }
+    }
 
     /** Persists the current values; the screen then navigates to the live screen. */
     fun save(onSaved: () -> Unit = {}) {

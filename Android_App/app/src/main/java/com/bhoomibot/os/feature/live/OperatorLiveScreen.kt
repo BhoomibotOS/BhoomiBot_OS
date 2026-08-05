@@ -26,9 +26,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Cached
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
@@ -52,9 +55,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.widget.Toast
 import com.bhoomibot.os.connection.transport.LiveConnectionState
+import com.bhoomibot.os.feature.connection.PhoneNetworkMode
 import com.bhoomibot.os.ui.theme.SafetyRed
 import com.bhoomibot.os.ui.theme.SignalGreen
 
@@ -74,14 +83,15 @@ fun OperatorLiveScreen(
     // recomposes. `by` delegates so we can read fields directly as `state.xxx`.
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    // Surface connection-state changes as on-screen Toasts (no terminal needed).
+    // Surface connection-state changes as on-screen Toasts.
     LaunchedEffect(state.connectionState) {
+        val isHotspot = state.networkMode == PhoneNetworkMode.HOTSPOT
         val msg = when (state.connectionState) {
-            LiveConnectionState.CONNECTED -> "OPERATOR: Connected to relay (Live)"
-            LiveConnectionState.CONNECTING -> "OPERATOR: Connecting to relay…"
-            LiveConnectionState.RECONNECTING -> "OPERATOR: Connection lost — reconnecting…"
-            LiveConnectionState.ERROR -> "OPERATOR: Connection failed (Offline)"
-            LiveConnectionState.IDLE -> "OPERATOR: Idle"
+            LiveConnectionState.CONNECTED -> if (isHotspot) "HOTSPOT: Link Active" else "INTERNET: Connected to relay"
+            LiveConnectionState.CONNECTING -> if (isHotspot) "HOTSPOT: Searching for Robot..." else "INTERNET: Connecting..."
+            LiveConnectionState.RECONNECTING -> "Link lost — retrying..."
+            LiveConnectionState.ERROR -> "No connection"
+            LiveConnectionState.IDLE -> "No connection"
         }
         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
     }
@@ -113,17 +123,40 @@ fun OperatorLiveScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
+            
+            // AI Vision Overlay (Bounding Boxes for Weeds)
+            Canvas(Modifier.fillMaxSize()) {
+                state.detectedObjects.forEach { obj ->
+                    val rect = obj.boundingBox
+                    drawRect(
+                        color = SafetyRed,
+                        topLeft = Offset(rect.left * size.width, rect.top * size.height),
+                        size = Size(rect.width() * size.width, rect.height() * size.height),
+                        style = Stroke(width = 2.dp.toPx())
+                    )
+                }
+            }
         } else {
             Column(
                 Modifier.align(Alignment.Center),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                CircularProgressIndicator(color = SignalGreen)
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    "Waiting for the robot's live feed…",
-                    color = Color.White.copy(alpha = 0.8f)
-                )
+                if (state.connectionState == LiveConnectionState.CONNECTED || state.connectionState == LiveConnectionState.CONNECTING) {
+                    CircularProgressIndicator(color = SignalGreen)
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        if (state.networkMode == PhoneNetworkMode.HOTSPOT) "Waiting for Robot Hub..." else "Waiting for Internet Feed...",
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                } else {
+                    Icon(Icons.Default.Videocam, null, tint = SafetyRed, modifier = Modifier.size(48.dp))
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "No connection",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
 
@@ -133,7 +166,11 @@ fun OperatorLiveScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBackClick) { Icon(Icons.Default.ArrowBack, "Back", tint = Color.White) }
-            Text("OPERATOR LIVE", color = Color.White, fontWeight = FontWeight.Bold)
+            Text(
+                if (state.networkMode == PhoneNetworkMode.HOTSPOT) "HOTSPOT VIEW" else "INTERNET LIVE", 
+                color = Color.White, 
+                fontWeight = FontWeight.Bold
+            )
             Spacer(Modifier.weight(1f))
             ConnectionBadge(state.connectionState, Modifier)
             Spacer(Modifier.width(8.dp))
@@ -178,27 +215,36 @@ fun OperatorLiveScreen(
                 .padding(8.dp)
         )
 
-        // Live camera switch (bottom-center): remotely starts/stops the robot's
-        // broadcast over the relay. The link stays connected; only the stream toggles.
-        Surface(
-            Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
-            shape = RoundedCornerShape(14.dp),
-            color = Color.Black.copy(alpha = 0.5f)
-        ) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Videocam, null, tint = Color.White)
-                Spacer(Modifier.width(8.dp))
-                Text("Live camera", color = Color.White, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(12.dp))
-                Switch(checked = state.liveCameraEnabled, onCheckedChange = viewModel::setLiveCameraEnabled)
-            }
-        }
-
         // Diagnostic: this phone's role + Robot ID + session so a role/key
         // mismatch (the usual "connected but no video" cause) is visible.
-        SessionInfoChip(
-            state.activeRole, state.activeRobotId, state.activeSession,
-            Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
-        )
+        Column(
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            SessionInfoChip(state.activeRole, state.activeRobotId, state.activeSession, Modifier)
+            Spacer(Modifier.height(8.dp))
+            // AI Status Bar (AI-004 Feedback)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    shape = CircleShape,
+                    color = if (state.aiStatus.contains("Ready")) SignalGreen else Color.Gray,
+                    modifier = Modifier.size(8.dp)
+                ) {}
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    state.aiStatus,
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            if (state.aiSteeringOffset != 0f) {
+                Text(
+                    "Steering Correction: ${if (state.aiSteeringOffset > 0) "RIGHT" else "LEFT"} (${(state.aiSteeringOffset * 100).toInt()}%)",
+                    color = SignalGreen,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
     }
 }

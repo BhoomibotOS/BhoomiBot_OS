@@ -9,6 +9,12 @@ enum class DrivingMode {
     JOYSTICK  // Drag a virtual joystick
 }
 
+// Control path selection
+enum class ControlPath {
+    DIRECT_VCU,   // Operator phone -> VCU (Bluetooth)
+    VIA_ROBOT     // Operator phone -> Robot phone (WebSocket) -> VCU (Bluetooth)
+}
+
 /**
  * Immutable snapshot of everything [ManualControlScreen] displays; produced by [ManualViewModel]
  * and consumed (read-only) by the Composables. It carries UI state only — the actual robot
@@ -28,6 +34,11 @@ data class ManualUiState(
     val cameraLightEnabled: Boolean = false,           // Camera torch/flash on/off
     val isCameraMaximized: Boolean = false,            // true = camera shown full-screen (landscape)
     val cameraEnabled: Boolean = true,                 // Camera feed on/off (Live camera switch)
+    val useRearCamera: Boolean = true,                 // Front vs Rear camera
     val lastCommand: DriveCommand = DriveCommand.STOP, // Most recent drive command sent
-    val bluetoothConnected: Boolean = false            // ESP32/Bluetooth link status (reserved)
+    val bluetoothConnected: Boolean = false,           // ESP32/Bluetooth link status
+    val isRecording: Boolean = false,                  // Whether a mission recording session is active
+    val controlPath: ControlPath = ControlPath.DIRECT_VCU, // Default to direct control
+    val leftRpm: Int = 0,                             // Real-time RPM from Left Motor
+    val rightRpm: Int = 0                             // Real-time RPM from Right Motor
 )

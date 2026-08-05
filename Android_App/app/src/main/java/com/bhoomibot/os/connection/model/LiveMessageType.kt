@@ -10,7 +10,8 @@ enum class LiveMessageType(val code: String) {
     ERROR("ERROR"),
     PEER_STATUS("PEER_STATUS"),
     PING("PING"),
-    PONG("PONG");
+    PONG("PONG"),
+    ALERT("ALERT");
 
     companion object {
         // Parse a wire `type` string back into an enum. Unknown/absent codes map to

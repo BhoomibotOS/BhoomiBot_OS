@@ -10,6 +10,7 @@ package com.bhoomibot.os.repository
 
 import com.bhoomibot.os.model.DriveCommand
 import com.bhoomibot.os.model.RobotStatus
+import kotlinx.coroutines.flow.StateFlow
 
 /** Boundary for a future ESP32/VCU transport implementation.
  *  Every screen talks to the robot ONLY through this interface, so we can later swap the
@@ -18,6 +19,12 @@ import com.bhoomibot.os.model.RobotStatus
 interface RobotRepository {
     // Returns the latest known robot status snapshot (battery, mode, GPS, etc.).
     fun status(): RobotStatus
+
+    // Returns the current connection state of the hardware transport.
+    val isConnected: StateFlow<Boolean>
+
+    // Real-time RPM feedback from the motors (Left, Right)
+    val rpmData: StateFlow<Pair<Int, Int>>
 
     // Sends a movement/stop command to the robot (FORWARD, STOP, EMERGENCY_STOP, ...).
     fun sendDriveCommand(command: DriveCommand)
