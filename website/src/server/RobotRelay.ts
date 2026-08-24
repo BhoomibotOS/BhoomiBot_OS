@@ -23,6 +23,7 @@ export class RobotRelay {
 
     return new Response(null, {
       status: 101,
+      // @ts-ignore
       webSocket: client,
     });
   }

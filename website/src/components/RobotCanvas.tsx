@@ -155,6 +155,7 @@ function RobotModel({ attachment = "none" }: { attachment?: string }) {
         <AnimatePresence mode="wait">
           {attachment === "plough" && (
             <motion.group
+              // @ts-ignore
               key="plough"
               initial={{ scale: 0, y: -0.5 }}
               animate={{ scale: 1, y: 0 }}
@@ -176,6 +177,7 @@ function RobotModel({ attachment = "none" }: { attachment?: string }) {
 
           {attachment === "sprayer" && (
             <motion.group
+              // @ts-ignore
               key="sprayer"
               initial={{ scale: 0, z: 0 }}
               animate={{ scale: 1, z: -0.3 }}
@@ -195,6 +197,7 @@ function RobotModel({ attachment = "none" }: { attachment?: string }) {
 
           {attachment === "cargo" && (
             <motion.group
+              // @ts-ignore
               key="cargo"
               initial={{ scale: 0, y: 1 }}
               animate={{ scale: 1, y: 0.55 }}
