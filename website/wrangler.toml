@@ -15,7 +15,7 @@ bindings = [{name = "RELAY", class_name = "RobotRelay"}]
 
 [[migrations]]
 tag = "v1"
-new_classes = ["RobotRelay"]
+new_sqlite_classes = ["RobotRelay"]
 
 # D1 Database placeholder removed to fix build error.
 # Re-add once you have created a database in the Cloudflare Dashboard.
