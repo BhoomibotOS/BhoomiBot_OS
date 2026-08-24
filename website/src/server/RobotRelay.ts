@@ -1,65 +1,50 @@
 // @ts-nocheck
 export class RobotRelay {
-  state: any;
-  env: any;
-  sessions: Map<WebSocket, any> = new Map();
-
-  constructor(state: any, env: any) {
+  constructor(state, env) {
     this.state = state;
     this.env = env;
+    this.sessions = new Map();
   }
 
-  async fetch(request: Request) {
+  async fetch(request) {
     const upgradeHeader = request.headers.get('Upgrade');
     if (upgradeHeader === 'websocket') {
-      const [client, server] = new (globalThis as any).WebSocketPair();
+      const pair = new WebSocketPair();
+      const [client, server] = [pair[0], pair[1]];
       await this.handleSession(server);
       return new Response(null, { status: 101, webSocket: client });
     }
-    return new Response("RobotRelay DO is active.", { status: 200 });
+    return new Response("Durable Object Active", { status: 200 });
   }
 
-  async handleSession(ws: WebSocket) {
+  async handleSession(ws) {
     ws.accept();
     ws.addEventListener('message', async (msg) => {
-      const meta = this.sessions.get(ws);
-      if (!meta) {
-        try {
+      try {
+        const meta = this.sessions.get(ws);
+        if (!meta) {
           const hello = JSON.parse(msg.data);
           if (hello.type === 'HELLO') {
-            const payload = JSON.parse(hello.payload || '{}');
+            const p = JSON.parse(hello.payload || '{}');
             this.sessions.set(ws, {
               robotId: hello.robotId || 'default',
-              session: payload.session || '',
-              role: payload.role || 'OPERATOR'
+              session: p.session || '',
+              role: p.role || 'OPERATOR'
             });
-            this.broadcastPeerStatus();
           }
-        } catch(e) {}
-        return;
-      }
-      this.relayMessage(ws, meta, msg.data);
+          return;
+        }
+        // Relay to others
+        for (const [peer, peerMeta] of this.sessions.entries()) {
+          if (peer !== ws && peerMeta.robotId === meta.robotId && peerMeta.session === meta.session) {
+            peer.send(msg.data);
+          }
+        }
+      } catch (e) {}
     });
 
     ws.addEventListener('close', () => {
       this.sessions.delete(ws);
-      this.broadcastPeerStatus();
     });
-  }
-
-  relayMessage(sender: WebSocket, meta: any, data: any) {
-    for (const [ws, otherMeta] of this.sessions.entries()) {
-      if (ws !== sender && otherMeta.robotId === meta.robotId && otherMeta.session === meta.session) {
-        try { ws.send(data); } catch (e) { this.sessions.delete(ws); }
-      }
-    }
-  }
-
-  broadcastPeerStatus() {
-    // Basic status broadcast logic
-    const statusMsg = JSON.stringify({ type: 'PEER_STATUS', ts: Date.now() });
-    for (const [ws] of this.sessions.entries()) {
-      try { ws.send(statusMsg); } catch(e) {}
-    }
   }
 }
