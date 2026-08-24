@@ -22,6 +22,8 @@ import { FAQ } from "@/components/sections/FAQ"
 import { About } from "@/components/sections/About"
 import { Contact } from "@/components/sections/Contact"
 
+export const runtime = 'edge';
+
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col">
