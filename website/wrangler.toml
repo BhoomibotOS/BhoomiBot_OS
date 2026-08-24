@@ -1,14 +1,14 @@
 name = "bhoomibot"
-main = ".worker-next/index.js"
+main = ".vercel/output/static/_worker.js/index.js"
 compatibility_date = "2024-08-24"
 compatibility_flags = ["nodejs_compat"]
 
 [site]
-bucket = ".worker-next/assets"
+bucket = ".vercel/output/static"
 
 [vars]
 # Video Relay Configuration
-SIGNALING_SERVER = "wss://bhoomibot-labs.your-subdomain.workers.dev/api/relay"
+SIGNALING_SERVER = "wss://bhoomibot.your-subdomain.workers.dev/api/relay"
 
 [durable_objects]
 bindings = [{name = "RELAY", class_name = "RobotRelay"}]
