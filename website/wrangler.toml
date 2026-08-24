@@ -8,7 +8,7 @@ bucket = ".vercel/output/static"
 
 [vars]
 # Video Relay Configuration
-SIGNALING_SERVER = "wss://bhoomibot.your-subdomain.workers.dev/api/relay"
+# SIGNALING_SERVER = "wss://bhoomibot.<your-subdomain>.workers.dev/api/relay"
 
 [durable_objects]
 bindings = [{name = "RELAY", class_name = "RobotRelay"}]
@@ -17,7 +17,9 @@ bindings = [{name = "RELAY", class_name = "RobotRelay"}]
 tag = "v1"
 new_classes = ["RobotRelay"]
 
-[[d1_databases]]
-binding = "DB"
-database_name = "bhoomibot_db"
-database_id = "your-d1-db-id"
+# D1 Database placeholder removed to fix build error.
+# Re-add once you have created a database in the Cloudflare Dashboard.
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "bhoomibot_db"
+# database_id = "your-actual-db-id-here"
