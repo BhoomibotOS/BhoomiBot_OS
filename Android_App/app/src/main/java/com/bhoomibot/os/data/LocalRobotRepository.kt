@@ -40,4 +40,7 @@ class LocalRobotRepository : RobotRepository {
     override fun setHydraulic(heightPercent: Int) = Unit
     // No-op: would pulse the horn.
     override fun horn() = Unit
+
+    // No-op: would trigger OTA.
+    override fun triggerOta() = Unit
 }

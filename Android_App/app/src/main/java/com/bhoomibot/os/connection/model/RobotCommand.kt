@@ -16,5 +16,7 @@ data class RobotCommand(
     // learningMode is the operator's remote "record/learn" switch.
     val learningMode: Boolean? = null,
     // useRearCamera: true = use back (rear) camera, false = use front camera, null = no change
-    val useRearCamera: Boolean? = null
+    val useRearCamera: Boolean? = null,
+    // triggerOta: true = enter OTA mode on VCU
+    val triggerOta: Boolean = false
 )

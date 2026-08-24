@@ -54,6 +54,10 @@ class MockRobotRepository(private val mockVcu: MockVcu = MockVcu()) : RobotRepos
         mockVcu.onCommandReceived(hornCommand())
     }
 
+    override fun triggerOta() {
+        // No-op for mock simulation
+    }
+
     override fun disconnect() {
         _isConnected.value = false
     }

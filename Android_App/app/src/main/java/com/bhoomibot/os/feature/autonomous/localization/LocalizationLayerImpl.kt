@@ -3,7 +3,7 @@ package com.bhoomibot.os.feature.autonomous.localization
 import android.content.Context
 import com.bhoomibot.os.data.LocationTracker
 import com.bhoomibot.os.feature.autonomous.core.interfaces.LocalizationLayer
-import com.bhoomibot.os.feature.autonomous.core.model.RobotPose
+import com.bhoomibot.sdk.RobotPose
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -14,16 +14,13 @@ import kotlinx.coroutines.launch
 
 /**
  * FEATURE: L5 Localization Layer Implementation
- * 
- * JUNIOR ENGINEER NOTE: This layer uses the phone's GPS to tell the robot "Where am I".
- * It listens to the LocationTracker and converts it into a standard RobotPose.
  */
 class LocalizationLayerImpl(context: Context) : LocalizationLayer {
 
     private val locationTracker = LocationTracker(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     
-    private val _pose = MutableStateFlow(RobotPose(0.0, 0.0, 0.0, 0.0, 0f, 0f))
+    private val _pose = MutableStateFlow(RobotPose(0.0, 0.0, 0.0, 0.0, 0f, 0L))
     
     init {
         locationTracker.startTracking()
@@ -36,7 +33,6 @@ class LocalizationLayerImpl(context: Context) : LocalizationLayer {
                         altitude = loc.altitude,
                         heading = loc.bearing.toDouble(),
                         speedMps = loc.speed,
-                        accuracyMeters = loc.accuracy,
                         timestamp = loc.time
                     )
                 }
@@ -46,7 +42,5 @@ class LocalizationLayerImpl(context: Context) : LocalizationLayer {
 
     override fun getRobotPose(): StateFlow<RobotPose> = _pose.asStateFlow()
 
-    override suspend fun updateSensorData(gps: Any, imu: Any) {
-        // Future: Handle raw NMEA or IMU frames for higher frequency EKF fusion
-    }
+    override suspend fun updateSensorData(gps: Any, imu: Any) {}
 }

@@ -1,15 +1,12 @@
 package com.bhoomibot.os.feature.autonomous.skills.execution
 
-import com.bhoomibot.os.feature.autonomous.core.model.SkillExecution
-import com.bhoomibot.os.feature.autonomous.core.model.TaskPlan
+import com.bhoomibot.sdk.SkillStep
+import com.bhoomibot.sdk.TaskPlan
 import com.bhoomibot.os.feature.autonomous.skills.models.DemonstratedSkill
 import java.util.UUID
 
 /**
  * MISSION PLANNER: The "Compiler" of the AgentOS.
- * 
- * It takes a high-level goal and a learned Skill, then "unrolls" it 
- * into a sequence of executable robotic steps.
  */
 object MissionPlanner {
 
@@ -17,11 +14,11 @@ object MissionPlanner {
      * Creates an actionable TaskPlan from a demonstrated skill and user parameters.
      */
     fun createMissionFromSkill(skill: DemonstratedSkill, repeats: Int = 1): TaskPlan {
-        val allSteps = mutableListOf<SkillExecution>()
+        val allSteps = mutableListOf<SkillStep>()
 
         repeat(repeats) { iteration ->
             skill.steps.forEach { step ->
-                allSteps.add(SkillExecution(
+                allSteps.add(SkillStep(
                     skillId = step.actionType.name,
                     parameters = step.parameters + mapOf(
                         "lat" to (step.latitude?.toString() ?: ""),
@@ -32,9 +29,6 @@ object MissionPlanner {
             }
         }
 
-        return TaskPlan(
-            originalIntentId = "generated_${UUID.randomUUID()}",
-            steps = allSteps
-        )
+        return TaskPlan(allSteps)
     }
 }

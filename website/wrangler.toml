@@ -1,0 +1,23 @@
+name = "bhoomibot-labs"
+main = ".open-next/worker.js"
+compatibility_date = "2024-08-24"
+compatibility_flags = ["nodejs_compat"]
+
+[site]
+bucket = ".open-next/assets"
+
+[vars]
+# Video Relay Configuration
+SIGNALING_SERVER = "wss://bhoomibot-labs.your-subdomain.workers.dev/api/relay"
+
+[durable_objects]
+bindings = [{name = "RELAY", class_name = "RobotRelay"}]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RobotRelay"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bhoomibot_db"
+database_id = "your-d1-db-id"

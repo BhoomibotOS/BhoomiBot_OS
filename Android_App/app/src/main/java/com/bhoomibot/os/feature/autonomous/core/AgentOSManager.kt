@@ -1,7 +1,9 @@
 package com.bhoomibot.os.feature.autonomous.core
 
-import android.app.Application
 import android.content.Context
+import com.bhoomibot.ai.MasterBrain
+import com.bhoomibot.ai.agent.AgentDriver
+import com.bhoomibot.ai.agent.CloudAgentDriver
 import com.bhoomibot.os.feature.autonomous.agent.AgentLayerImpl
 import com.bhoomibot.os.feature.autonomous.ai.PerceptionLayerImpl
 import com.bhoomibot.os.feature.autonomous.control.ControlLayerImpl
@@ -20,18 +22,19 @@ import kotlinx.coroutines.launch
 
 /**
  * AgentOSManager: The central conductor of the 9-layer stack.
- * 
- * JUNIOR ENGINEER NOTE: This is where we "plug in" all the layers. 
- * It manages the flow of data from the human (L0) down to the wheels (L8).
  */
 class AgentOSManager(context: Context) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    // Plug in implementations
+    // AI-Fix: API Key for Llama-3 Cloud Wisdom
+    private val cloudDriver: AgentDriver = CloudAgentDriver("YOUR_API_KEY_HERE")
+    val masterBrain = MasterBrain(cloudDriver)
+
+    // Local Android Layers
     val knowledge: KnowledgeLayer = KnowledgeLayerImpl(context)
     val planner: PlannerLayer = PlannerLayerImpl()
-    val agent: AgentLayer = AgentLayerImpl(context, knowledge, planner)
+    val agent: AgentLayer = AgentLayerImpl(context, knowledge, planner, masterBrain)
     val skills: SkillLayer = SkillLayerImpl()
     val perception: PerceptionLayer = PerceptionLayerImpl(context)
     val localization: LocalizationLayer = LocalizationLayerImpl(context)
@@ -45,15 +48,13 @@ class AgentOSManager(context: Context) {
     fun startCoreLoop() {
         scope.launch {
             localization.getRobotPose().collect { pose ->
-                // 1. Sync perception and pose into the World Model
-                // (In a real system, this would be high-frequency)
                 worldModel.syncPerception(pose, emptyList())
             }
         }
     }
 
     /**
-     * Execute a specific user command.
+     * Execute a user command.
      */
     suspend fun executeNaturalCommand(text: String): AgentResponse {
         return agent.processIntent(text)

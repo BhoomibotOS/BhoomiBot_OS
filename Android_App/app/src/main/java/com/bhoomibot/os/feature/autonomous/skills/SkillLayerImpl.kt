@@ -1,30 +1,24 @@
 package com.bhoomibot.os.feature.autonomous.skills
 
 import com.bhoomibot.os.feature.autonomous.core.interfaces.SkillLayer
-import com.bhoomibot.os.feature.autonomous.core.model.*
-import com.bhoomibot.os.model.Waypoint
+import com.bhoomibot.sdk.*
 
 /**
  * FEATURE: L3 Skill Registry Implementation
- * 
- * JUNIOR ENGINEER NOTE: This is where robot capabilities live. 
- * Each Skill (Navigate, Spray) produces a physical Trajectory (Path).
  */
 class SkillLayerImpl : SkillLayer {
 
     private val availableSkills = listOf(
-        Skill("NAVIGATE", "Drive to Location", listOf("target")),
-        Skill("ATTACH", "Pickup Object", listOf("tool")),
-        Skill("DETACH", "Drop Object", emptyList()),
-        Skill("DRIVE_TO_LEARN", "Teaching Mode", listOf("name"))
+        com.bhoomibot.sdk.Skill("NAVIGATE", "Drive to Location"),
+        com.bhoomibot.sdk.Skill("ATTACH", "Pickup Object"),
+        com.bhoomibot.sdk.Skill("DETACH", "Drop Object")
     )
 
-    override suspend fun executeSkill(skillExecution: SkillExecution): Trajectory {
+    override suspend fun executeSkill(skillExecution: SkillStep): Trajectory {
         return when (skillExecution.skillId) {
             "NAVIGATE" -> {
-                // Future: Query Knowledge Graph for Target GPS
                 Trajectory(
-                    waypoints = listOf(Waypoint(0.0, 0.0, 0L, 0f)), // Placeholder
+                    waypoints = listOf(BrainWaypoint(0.0, 0.0)),
                     targetSpeedMps = 1.0f
                 )
             }
@@ -32,5 +26,5 @@ class SkillLayerImpl : SkillLayer {
         }
     }
 
-    override fun getAvailableSkills(): List<Skill> = availableSkills
+    override fun getAvailableSkills(): List<com.bhoomibot.sdk.Skill> = availableSkills
 }

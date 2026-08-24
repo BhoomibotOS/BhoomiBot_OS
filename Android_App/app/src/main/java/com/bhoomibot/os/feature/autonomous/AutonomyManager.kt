@@ -23,6 +23,24 @@ object AutonomyManager {
     private var _playbackEngine: PlaybackEngine? = null
     private var _safetyMonitor: SafetyMonitor? = null
     private var _perceptionEngine: PerceptionEngine? = null
+    private var _agentOS: com.bhoomibot.os.feature.autonomous.core.AgentOSManager? = null
+    private var _planExecutor: com.bhoomibot.os.feature.autonomous.execution.PlanExecutionEngine? = null
+
+    var pendingPlan: com.bhoomibot.sdk.TaskPlan? = null
+
+    fun getAgentOS(context: Context): com.bhoomibot.os.feature.autonomous.core.AgentOSManager {
+        if (_agentOS == null) {
+            _agentOS = com.bhoomibot.os.feature.autonomous.core.AgentOSManager(context.applicationContext)
+        }
+        return _agentOS!!
+    }
+
+    fun getPlanExecutor(context: Context): com.bhoomibot.os.feature.autonomous.execution.PlanExecutionEngine {
+        if (_planExecutor == null) {
+            _planExecutor = com.bhoomibot.os.feature.autonomous.execution.PlanExecutionEngine(getAgentOS(context))
+        }
+        return _planExecutor!!
+    }
 
     /** 
      * Returns the engine responsible for saving manual driving data to the local database.

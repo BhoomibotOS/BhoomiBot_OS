@@ -1,43 +1,31 @@
 package com.bhoomibot.os.feature.autonomous.planning
 
 import com.bhoomibot.os.feature.autonomous.core.interfaces.PlannerLayer
-import com.bhoomibot.os.feature.autonomous.core.model.*
+import com.bhoomibot.sdk.*
 
 /**
  * FEATURE: L2 Task Planner Implementation
  */
 class PlannerLayerImpl : PlannerLayer {
 
-    override suspend fun createPlan(intent: Intent, context: List<KnowledgeNode>): TaskPlan {
-        val steps = mutableListOf<SkillExecution>()
+    override suspend fun createPlan(intent: RobotIntent, context: List<com.bhoomibot.sdk.KnowledgeNode>): TaskPlan {
+        val steps = mutableListOf<SkillStep>()
 
         when (intent.action) {
-            "TRANSPORT" -> {
-                val subject = intent.subject ?: "LOAD"
-                val source = intent.source ?: "Shed"
-                val dest = intent.destination ?: "Home"
-                
-                // For 'N' trips, repeat the sequence
+            RobotAction.TRANSPORT -> {
                 repeat(intent.repeatCount) {
-                    steps.add(SkillExecution("NAVIGATE", mapOf("target" to source)))
-                    steps.add(SkillExecution("ATTACH", mapOf("tool" to subject)))
-                    steps.add(SkillExecution("NAVIGATE", mapOf("target" to dest)))
-                    steps.add(SkillExecution("DETACH", emptyMap()))
+                    steps.add(SkillStep("NAVIGATE", mapOf("target" to (intent.source ?: "Shed"))))
+                    steps.add(SkillStep("ATTACH", mapOf("tool" to (intent.subject ?: "LOAD"))))
+                    steps.add(SkillStep("NAVIGATE", mapOf("target" to (intent.destination ?: "Home"))))
+                    steps.add(SkillStep("DETACH"))
                 }
             }
-            "LEARN" -> {
-                val name = intent.subject ?: "Unknown"
-                steps.add(SkillExecution("DRIVE_TO_LEARN", mapOf("name" to name)))
+            RobotAction.NAVIGATE -> {
+                steps.add(SkillStep("NAVIGATE", mapOf("target" to (intent.destination ?: "Home"))))
             }
-            "NAVIGATE" -> {
-                val dest = intent.destination ?: "Home"
-                steps.add(SkillExecution("NAVIGATE", mapOf("target" to dest)))
-            }
+            else -> {}
         }
 
-        return TaskPlan(
-            originalIntentId = intent.id,
-            steps = steps
-        )
+        return TaskPlan(steps)
     }
 }

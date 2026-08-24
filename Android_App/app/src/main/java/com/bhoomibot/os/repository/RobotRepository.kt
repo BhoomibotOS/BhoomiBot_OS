@@ -44,6 +44,9 @@ interface RobotRepository {
     // Pulses the horn once (one-shot, like GamePad.isSelectPressed()).
     fun horn()
 
+    // Triggers the OTA maintenance mode on the VCU.
+    fun triggerOta()
+
     // Releases the underlying transport (Bluetooth socket / WiFi connection). No-op by default.
     fun disconnect() = Unit
 }

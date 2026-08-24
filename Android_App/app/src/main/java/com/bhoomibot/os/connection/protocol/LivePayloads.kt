@@ -43,6 +43,7 @@ object LivePayloads {
         putOpt("lights", c.lights)
         putOpt("liveCamera", c.liveCamera)
         putOpt("useRearCamera", c.useRearCamera)
+        put("triggerOta", c.triggerOta)
     }.toString()
 
     fun decodeCommand(json: String?): RobotCommand? = runCatching {
@@ -58,7 +59,8 @@ object LivePayloads {
             pto = if (o.isNull("pto")) null else o.optBoolean("pto"),
             lights = if (o.isNull("lights")) null else o.optBoolean("lights"),
             liveCamera = if (o.isNull("liveCamera")) null else o.optBoolean("liveCamera"),
-            useRearCamera = if (o.isNull("useRearCamera")) null else o.optBoolean("useRearCamera")
+            useRearCamera = if (o.isNull("useRearCamera")) null else o.optBoolean("useRearCamera"),
+            triggerOta = o.optBoolean("triggerOta", false)
         )
     }.getOrNull()
 

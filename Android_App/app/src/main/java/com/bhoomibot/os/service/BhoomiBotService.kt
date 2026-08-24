@@ -5,8 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.PowerManager
+import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.LifecycleOwner
 import com.bhoomibot.os.connection.model.VideoQuality
 import com.bhoomibot.os.connection.provideLiveLinkRepository
 import com.bhoomibot.os.data.DevicePreferences
@@ -15,11 +18,10 @@ import com.bhoomibot.os.model.DeviceRole
 import com.bhoomibot.os.repository.provideRobotRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
  * BhoomiBotService: The permanent heart of the robot operations.
- * Handles both Video Streaming and Hardware Command Forwarding.
  */
 class BhoomiBotService : LifecycleService() {
 
@@ -31,6 +33,7 @@ class BhoomiBotService : LifecycleService() {
     
     private var currentQuality: VideoQuality? = null
     private var currentUseRear: Boolean? = null
+    private var bridgeJob: Job? = null
     
     companion object {
         private const val CHANNEL_ID = "bhoomibot_service_channel"
@@ -47,8 +50,12 @@ class BhoomiBotService : LifecycleService() {
         
         fun start(context: Context) {
             val intent = Intent(context, BhoomiBotService::class.java).apply { action = ACTION_START_HARDWARE }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
-            else context.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
+                else context.startService(intent)
+            } catch (e: Exception) {
+                android.util.Log.e("RobotService", "FGS Start Failed: ${e.message}")
+            }
         }
         
         fun stop(context: Context) {
@@ -61,16 +68,33 @@ class BhoomiBotService : LifecycleService() {
         super.onCreate()
         isRunning = true
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, createNotification())
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            try {
+                startForeground(NOTIFICATION_ID, createNotification(), type)
+            } catch (e: Exception) {
+                startForeground(NOTIFICATION_ID, createNotification())
+            }
+        } else {
+            startForeground(NOTIFICATION_ID, createNotification())
+        }
         
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "BhoomiBot::RobotBrainLock")
         wakeLock?.acquire()
         
-        // AI-Fix: Always start command bridge for robot devices
-        startCommandBridge()
-        
-        android.util.Log.i("RobotService", "BhoomiBot Background Service Started")
+        serviceScope.launch {
+            DevicePreferences.role(applicationContext)
+                .distinctUntilChanged()
+                .collectLatest { role ->
+                    if (role == DeviceRole.ROBOT) {
+                        startCommandBridge()
+                    } else {
+                        bridgeJob?.cancel()
+                    }
+                }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -88,38 +112,43 @@ class BhoomiBotService : LifecycleService() {
             }
             ACTION_START_BROADCAST -> {
                 isBroadcastActive = true
+                updateForegroundType(camera = true)
                 startVision(quality, useRear)
             }
             ACTION_STOP_BROADCAST -> {
                 isBroadcastActive = false
                 stopVision()
+                updateForegroundType(camera = false)
                 checkAndStopSelf()
             }
             ACTION_SWITCH_CAMERA -> {
-                if (isBroadcastActive) {
-                    startVision(quality, useRear)
-                }
+                if (isBroadcastActive) startVision(quality, useRear)
             }
         }
         return START_STICKY
     }
 
-    /**
-     * PERMANENT COMMAND BRIDGE
-     * This loop runs for the entire life of the service. 
-     * It receives Operator Wi-Fi commands and pushes them to VCU Bluetooth.
-     */
+    private fun updateForegroundType(camera: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            if (camera && ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+            }
+            try {
+                startForeground(NOTIFICATION_ID, createNotification(), type)
+            } catch (e: Exception) {
+                android.util.Log.e("RobotService", "Failed to update service type: ${e.message}")
+            }
+        }
+    }
+
     private fun startCommandBridge() {
+        bridgeJob?.cancel()
         val liveRepo = provideLiveLinkRepository(application)
         val robotRepo = provideRobotRepository(application)
-        val recordingEngine = AutonomyManager.getRecordingEngine(this)
 
-        // AI-Fix: Move to Default dispatcher for high-priority computation
-        serviceScope.launch(Dispatchers.Default) {
+        bridgeJob = serviceScope.launch(Dispatchers.Default) {
             liveRepo.incomingCommands.collect { cmd ->
-                android.util.Log.d("RobotService", "Forwarding Command to VCU: ${cmd.drive} @ ${cmd.speedPercent}%")
-                
-                // 1. Forward to VCU (Bluetooth)
                 if (cmd.emergencyStop) {
                     robotRepo.sendDriveCommand(com.bhoomibot.os.model.DriveCommand.EMERGENCY_STOP)
                 } else {
@@ -128,49 +157,27 @@ class BhoomiBotService : LifecycleService() {
                 }
                 cmd.pto?.let { robotRepo.setPto(it) }
                 cmd.lights?.let { robotRepo.setLights(it) }
-
-                // 2. Handle Recording (If learning is enabled)
-                if (cmd.learningMode != null) {
-                    if (cmd.learningMode == true) recordingEngine.startRecording()
-                    else recordingEngine.stopRecording()
-                }
-                if (recordingEngine.isRecording()) {
-                    recordingEngine.recordCommand(cmd)
-                }
-                cmd.liveCamera?.let {
-                    if (it) {
-                        val startIntent = Intent(applicationContext, BhoomiBotService::class.java).apply {
-                            action = ACTION_START_BROADCAST
-                            putExtra("EXTRA_USE_REAR", cmd.useRearCamera ?: currentUseRear ?: true)
-                        }
-                        startService(startIntent)
-                    } else {
-                        val stopIntent = Intent(applicationContext, BhoomiBotService::class.java).apply {
-                            action = ACTION_STOP_BROADCAST
-                        }
-                        startService(stopIntent)
-                    }
+                
+                if (cmd.triggerOta) {
+                    robotRepo.triggerOta()
                 }
 
-                // Only switch if explicitly requested via useRearCamera field
-                if (isBroadcastActive && cmd.useRearCamera != null && currentUseRear != cmd.useRearCamera) {
-                    val switchIntent = Intent(applicationContext, BhoomiBotService::class.java).apply {
-                        action = ACTION_SWITCH_CAMERA
-                        putExtra("EXTRA_USE_REAR", cmd.useRearCamera)
+                if (cmd.liveCamera != null) {
+                    val intent = Intent(applicationContext, BhoomiBotService::class.java).apply {
+                        action = if (cmd.liveCamera!!) ACTION_START_BROADCAST else ACTION_STOP_BROADCAST
+                        putExtra("EXTRA_USE_REAR", cmd.useRearCamera ?: true)
                     }
-                    startService(switchIntent)
+                    startService(intent)
                 }
             }
         }
     }
 
     private fun startVision(quality: VideoQuality, useRearCamera: Boolean) {
-        val perception = AutonomyManager.getPerceptionEngine(applicationContext)
-        val liveRepo = provideLiveLinkRepository(application)
-
-        // Reset state
         currentQuality = quality
         currentUseRear = useRearCamera
+        val perception = AutonomyManager.getPerceptionEngine(applicationContext)
+        val liveRepo = provideLiveLinkRepository(application)
 
         RobotCameraManager.stopCamera()
         RobotCameraManager.startCamera(
@@ -210,7 +217,7 @@ class BhoomiBotService : LifecycleService() {
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("BhoomiBot is Active")
-            .setContentText("Robot brain is alive. Controlling VCU & Camera.")
+            .setContentText("Hardware & Live systems synced.")
             .setSmallIcon(android.R.drawable.ic_menu_info_details)
             .setOngoing(true)
             .build()

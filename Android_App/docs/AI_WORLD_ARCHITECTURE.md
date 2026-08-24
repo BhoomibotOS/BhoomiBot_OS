@@ -1,3 +1,7 @@
+Strict instruction to AI coding,donot change this without developer approve
+
+
+
 # BhoomiBot: AgentOS Architecture (The Complete Master Blueprint)
 
 **Core Philosophy:** Don't just build a machine; build a **Learning Agent**. 

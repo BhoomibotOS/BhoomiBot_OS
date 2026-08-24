@@ -33,8 +33,8 @@ import com.bhoomibot.os.ui.theme.SignalGreen
 @Composable
 fun RobotSettingsScreen(
     onBackClick: () -> Unit,
-    onConnectionClick: () -> Unit = {},
-    onLiveLinkClick: () -> Unit = {}
+    onConnectionClick: () -> Unit,
+    onLiveLinkClick: () -> Unit
 ) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         // Top bar: back arrow + title.

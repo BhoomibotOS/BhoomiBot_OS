@@ -39,3 +39,6 @@ fun hydraulicCommand(heightPercent: Int): String = "HYD${heightPercent.coerceIn(
 
 /** Horn — one-shot pulse (like GamePad.isSelectPressed()). */
 fun hornCommand(): String = "HRN"
+
+/** Trigger OTA maintenance mode. Robot will stop, lock brakes, and boot WiFi. */
+fun otaMaintenanceCommand(): String = "OTA"

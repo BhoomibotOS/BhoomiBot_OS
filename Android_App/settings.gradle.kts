@@ -26,3 +26,11 @@ dependencyResolutionManagement {
 
 rootProject.name = "BhoomiBot_OS"
 include(":app")
+
+// AI-Fix: Link Standalone Brain Core from D:/Bhoomibot_OS/Repository/AI
+includeBuild("../AI") {
+    dependencySubstitution {
+        substitute(module("com.bhoomibot:ai-core")).using(project(":core"))
+        substitute(module("com.bhoomibot:ai-sdk")).using(project(":sdk"))
+    }
+}

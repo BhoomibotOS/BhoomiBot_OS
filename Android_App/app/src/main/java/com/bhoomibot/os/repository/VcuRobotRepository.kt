@@ -10,6 +10,7 @@ import com.bhoomibot.os.vcu.ConnectionPreferences
 import com.bhoomibot.os.vcu.hydraulicCommand
 import com.bhoomibot.os.vcu.hornCommand
 import com.bhoomibot.os.vcu.lightsCommand
+import com.bhoomibot.os.vcu.otaMaintenanceCommand
 import com.bhoomibot.os.vcu.ptoCommand
 import com.bhoomibot.os.vcu.speedCommand
 import com.bhoomibot.os.vcu.toProtocol
@@ -154,6 +155,10 @@ class VcuRobotRepository(private val context: Context) : RobotRepository {
 
     override fun horn() {
         commandChannel.trySend(hornCommand())
+    }
+
+    override fun triggerOta() {
+        commandChannel.trySend(otaMaintenanceCommand())
     }
 
     override fun disconnect() {

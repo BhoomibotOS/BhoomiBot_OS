@@ -8,7 +8,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -19,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bhoomibot.os.ui.theme.MutedText
+import com.bhoomibot.os.ui.theme.SafetyRed
 import com.bhoomibot.os.ui.theme.SignalGreen
 
 /**
@@ -84,6 +88,21 @@ fun SettingsScreen(
                 }
                 Text(">", color = MutedText, fontWeight = FontWeight.Bold)
             }
+        }
+        
+        Spacer(Modifier.height(24.dp))
+        
+        Text("MAINTENANCE", color = MutedText, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick = { viewModel.triggerOta() },
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = SafetyRed.copy(alpha = 0.1f), contentColor = SafetyRed)
+        ) {
+            Icon(Icons.Default.SystemUpdate, "OTA")
+            Spacer(Modifier.width(12.dp))
+            Text("TRIGGER OTA UPDATE MODE", fontWeight = FontWeight.Bold)
         }
     }
 }
