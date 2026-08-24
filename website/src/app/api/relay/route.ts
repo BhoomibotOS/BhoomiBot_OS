@@ -6,16 +6,21 @@ export const runtime = 'edge';
 export async function GET(request: Request) {
   try {
     const { env } = getRequestContext();
+
+    // Safety check for binding
+    if (!env || !env.RELAY) {
+      return new Response("RELAY binding missing in Next.js context", { status: 500 });
+    }
+
     const { searchParams } = new URL(request.url);
     const robotId = searchParams.get('robotId') || 'default';
 
-    // Get the Durable Object ID based on the Robot ID
+    // Route directly to the Durable Object
     const id = env.RELAY.idFromName(robotId);
     const obj = env.RELAY.get(id);
 
-    // Forward the WebSocket request to the Durable Object
     return obj.fetch(request);
   } catch (e) {
-    return new Response(`Relay Connection Error: ${e.message}`, { status: 500 });
+    return new Response(`Relay Error: ${e.message}`, { status: 500 });
   }
 }
