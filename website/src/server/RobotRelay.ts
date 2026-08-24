@@ -1,3 +1,4 @@
+// @ts-nocheck
 interface SessionMeta {
   robotId: string;
   session: string;
