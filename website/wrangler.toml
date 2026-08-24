@@ -1,10 +1,10 @@
-name = "bhoomibot-labs"
-main = ".open-next/worker.js"
+name = "bhoomibot"
+main = ".worker-next/index.js"
 compatibility_date = "2024-08-24"
 compatibility_flags = ["nodejs_compat"]
 
 [site]
-bucket = ".open-next/assets"
+bucket = ".worker-next/assets"
 
 [vars]
 # Video Relay Configuration
