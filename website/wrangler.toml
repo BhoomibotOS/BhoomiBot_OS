@@ -1,5 +1,5 @@
 name = "bhoomibot"
-main = ".vercel/output/static/_worker.js/index.js"
+main = "src/server/entry.ts"
 compatibility_date = "2024-08-24"
 compatibility_flags = ["nodejs_compat"]
 
