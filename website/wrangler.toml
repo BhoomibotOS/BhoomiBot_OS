@@ -3,12 +3,11 @@ main = "src/server/entry.ts"
 compatibility_date = "2024-08-24"
 compatibility_flags = ["nodejs_compat"]
 
+[observability.logs]
+enabled = true
+
 [site]
 bucket = ".vercel/output/static"
-
-[vars]
-# Video Relay Configuration
-# SIGNALING_SERVER = "wss://bhoomibot.<your-subdomain>.workers.dev/api/relay"
 
 [durable_objects]
 bindings = [{name = "RELAY", class_name = "RobotRelay"}]
@@ -16,10 +15,3 @@ bindings = [{name = "RELAY", class_name = "RobotRelay"}]
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RobotRelay"]
-
-# D1 Database placeholder removed to fix build error.
-# Re-add once you have created a database in the Cloudflare Dashboard.
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "bhoomibot_db"
-# database_id = "your-actual-db-id-here"
