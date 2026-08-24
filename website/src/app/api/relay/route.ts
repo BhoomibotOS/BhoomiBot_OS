@@ -1,39 +1,21 @@
 // @ts-nocheck
-import { NextResponse } from 'next/server';
+import { getRequestContext } from '@cloudflare/next-on-pages';
 
 export const runtime = 'edge';
 
 export async function GET(request: Request) {
-  const upgradeHeader = request.headers.get('Upgrade');
+  try {
+    const { env } = getRequestContext();
+    const { searchParams } = new URL(request.url);
+    const robotId = searchParams.get('robotId') || 'default';
 
-  if (!upgradeHeader || upgradeHeader !== 'websocket') {
-    return new Response('Expected Upgrade: websocket', { status: 426 });
+    // Get the Durable Object ID based on the Robot ID
+    const id = env.RELAY.idFromName(robotId);
+    const obj = env.RELAY.get(id);
+
+    // Forward the WebSocket request to the Durable Object
+    return obj.fetch(request);
+  } catch (e) {
+    return new Response(`Relay Connection Error: ${e.message}`, { status: 500 });
   }
-
-  // Get the room ID from the URL (e.g., /api/relay?robotId=BHOOMI-001)
-  const { searchParams } = new URL(request.url);
-  const robotId = searchParams.get('robotId') || 'default-room';
-
-  // In a real Cloudflare environment, we would access the Durable Object here
-  // via the platform object: env.RELAY.get(env.RELAY.idFromName(robotId))
-
-  // For now, we return a 101 Switching Protocols to indicate the server is ready
-  // to handle the WebSocket relay once deployed to Cloudflare.
-
-  const [client, server] = new (globalThis as any).WebSocketPair();
-
-  // Basic signaling logic for the Edge Worker
-  (server as any).accept();
-
-  server.addEventListener('message', (event: any) => {
-    // Broadcast signaling data (SDP/ICE) to the connected peer
-    // In the Durable Object, this would broadcast to all clients in the room
-    server.send(event.data);
-  });
-
-  return new Response(null, {
-    status: 101,
-    // @ts-ignore
-    webSocket: client,
-  });
 }

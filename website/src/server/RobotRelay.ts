@@ -1,22 +1,18 @@
 // @ts-nocheck
-interface SessionMeta {
-  robotId: string;
-  session: string;
-  role: 'ROBOT' | 'OPERATOR';
-}
-
 export class RobotRelay {
   state: any;
-  sessions: Map<WebSocket, SessionMeta> = new Map();
+  env: any;
+  sessions: Map<WebSocket, any> = new Map();
 
-  constructor(state: any) {
+  constructor(state: any, env: any) {
     this.state = state;
+    this.env = env;
   }
 
   async fetch(request: Request) {
     const upgradeHeader = request.headers.get('Upgrade');
     if (!upgradeHeader || upgradeHeader !== 'websocket') {
-      return new Response('Expected Upgrade: websocket', { status: 426 });
+      return new Response('Relay Active. Expected Upgrade: websocket', { status: 200 });
     }
 
     const [client, server] = new (globalThis as any).WebSocketPair();
@@ -24,7 +20,6 @@ export class RobotRelay {
 
     return new Response(null, {
       status: 101,
-      // @ts-ignore
       webSocket: client,
     });
   }
@@ -36,12 +31,8 @@ export class RobotRelay {
       try {
         const meta = this.sessions.get(ws);
 
-        // Handshake: First message must be HELLO
         if (!meta) {
-          if (typeof msg.data !== 'string') {
-             ws.close(1008, 'HELLO handshake required (text)');
-             return;
-          }
+          if (typeof msg.data !== 'string') return;
 
           const hello = JSON.parse(msg.data);
           if (hello.type === 'HELLO') {
@@ -52,18 +43,14 @@ export class RobotRelay {
 
             this.sessions.set(ws, { robotId, session, role });
             this.broadcastPeerStatus(robotId, session);
-            console.log(`[Relay] ${role} joined: ${robotId}::${session}`);
-          } else {
-            ws.close(1008, 'HELLO handshake required');
           }
           return;
         }
 
-        // Relay: Forward to all OTHER peers in the same session
         this.relayMessage(ws, meta, msg.data);
 
       } catch (err) {
-        console.error('[Relay Error]', err);
+        console.error('[DO Error]', err);
       }
     });
 
@@ -72,12 +59,11 @@ export class RobotRelay {
       if (meta) {
         this.sessions.delete(ws);
         this.broadcastPeerStatus(meta.robotId, meta.session);
-        console.log(`[Relay] ${meta.role} left: ${meta.robotId}::${meta.session}`);
       }
     });
   }
 
-  relayMessage(sender: WebSocket, meta: SessionMeta, data: any) {
+  relayMessage(sender: WebSocket, meta: any, data: any) {
     for (const [ws, otherMeta] of this.sessions.entries()) {
       if (ws !== sender && otherMeta.robotId === meta.robotId && otherMeta.session === meta.session) {
         try {
@@ -108,7 +94,7 @@ export class RobotRelay {
 
     for (const [ws, meta] of this.sessions.entries()) {
       if (meta.robotId === robotId && meta.session === session) {
-        ws.send(statusMsg);
+        try { ws.send(statusMsg); } catch(e) {}
       }
     }
   }
