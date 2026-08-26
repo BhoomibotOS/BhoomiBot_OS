@@ -1,8 +1,7 @@
 "use client"
 
 import React, { useEffect, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
-import { Wifi, Video, Play, Square, MessageSquare, ShieldAlert } from 'lucide-react'
+import { Video, Activity, Wifi, ShieldAlert } from 'lucide-react'
 
 interface LiveConsoleProps {
   robotId: string
@@ -11,22 +10,22 @@ interface LiveConsoleProps {
 
 export function LiveConsole({ robotId, sessionId }: LiveConsoleProps) {
   const [isConnected, setIsConnected] = useState(false)
-  const [peerStatus, setPeerStatus] = useState({ robot: false, operator: false })
-  const [lastTelemetry, setLastTelemetry] = useState<any>(null)
+  const [frameCount, setFrameCount] = useState(0)
+  const [lastFrameTime, setLastFrameTime] = useState<number>(0)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const socketRef = useRef<WebSocket | null>(null)
 
   const connect = () => {
-    // Determine the protocol based on the current environment
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const wsUrl = `${protocol}//${window.location.host}/api/relay?robotId=${robotId}`
 
+    console.log(`[Video] Connecting to ${wsUrl}`)
     const ws = new WebSocket(wsUrl)
     socketRef.current = ws
 
     ws.onopen = () => {
-      // Send HELLO Handshake as expected by your server.js logic
+      console.log(`[Video] Socket Open. Sending Handshake for ${robotId}`)
       const hello = {
         type: "HELLO",
         robotId: robotId,
@@ -38,55 +37,44 @@ export function LiveConsole({ robotId, sessionId }: LiveConsoleProps) {
     }
 
     ws.onmessage = async (event) => {
-      if (event.data instanceof Blob) {
-        // VIDEO FRAME (Binary)
+      // HANDLE BINARY VIDEO FRAMES
+      if (event.data instanceof Blob || event.data instanceof ArrayBuffer) {
+        setFrameCount(prev => prev + 1)
+        setLastFrameTime(Date.now())
         renderFrame(event.data)
       } else {
-        // JSON DATA (Telemetry or Status)
+        // HANDLE JSON MESSAGES
         try {
           const msg = JSON.parse(event.data)
           if (msg.type === 'PEER_STATUS') {
-            setPeerStatus(JSON.parse(msg.payload))
-          } else if (msg.type === 'TELEMETRY') {
-            setLastTelemetry(msg.payload)
+             console.log("[Video] Peer Status Update:", msg.payload)
           }
-        } catch (e) {
-          console.error("Failed to parse JSON message", e)
-        }
+        } catch (e) {}
       }
     }
 
     ws.onclose = () => {
       setIsConnected(false)
-      setPeerStatus({ robot: false, operator: false })
-      setTimeout(connect, 3000) // Auto-reconnect
+      console.log("[Video] Socket Closed. Reconnecting...")
+      setTimeout(connect, 3000)
     }
   }
 
-  const renderFrame = (blob: Blob) => {
+  const renderFrame = (data: Blob | ArrayBuffer) => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
+    const blob = data instanceof Blob ? data : new Blob([data], { type: 'image/jpeg' })
+    const url = URL.createObjectURL(blob)
     const img = new Image()
+
     img.onload = () => {
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      URL.revokeObjectURL(img.src)
+      URL.revokeObjectURL(url)
     }
-    img.src = URL.createObjectURL(blob)
-  }
-
-  const sendCommand = (cmd: string, params: any = {}) => {
-    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) return
-
-    const envelope = {
-      type: "COMMAND",
-      robotId: robotId,
-      ts: Date.now(),
-      payload: JSON.stringify({ command: cmd, ...params })
-    }
-    socketRef.current.send(JSON.stringify(envelope))
+    img.src = url
   }
 
   useEffect(() => {
@@ -95,85 +83,66 @@ export function LiveConsole({ robotId, sessionId }: LiveConsoleProps) {
   }, [robotId, sessionId])
 
   return (
-    <div className="bg-slate-900 rounded-[3rem] border border-white/10 overflow-hidden flex flex-col shadow-2xl h-full">
-      {/* Video Feed Area */}
-      <div className="relative flex-1 bg-black flex items-center justify-center min-h-[300px]">
+    <div className="bg-slate-900 rounded-[3rem] border border-white/10 overflow-hidden flex flex-col shadow-2xl h-full relative">
+      {/* Video Feed */}
+      <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
         <canvas
           ref={canvasRef}
-          width={640}
-          height={480}
+          width={1280}
+          height={720}
           className="w-full h-full object-contain"
         />
 
-        {!peerStatus.robot && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
-            <Video size={48} className="text-slate-700 mb-4 animate-pulse" />
-            <p className="text-white font-bold tracking-tighter">WAITING FOR ROBOT FEED...</p>
-            <p className="text-slate-500 text-[10px] mt-2 font-mono uppercase tracking-[0.2em]">Robot ID: {robotId}</p>
+        {!isConnected && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md">
+            <Wifi size={40} className="text-primary animate-pulse mb-4" />
+            <p className="text-white font-black tracking-tighter uppercase">Initializing Link...</p>
           </div>
         )}
 
-        <div className="absolute top-6 left-6 flex gap-3">
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-md border ${
-            isConnected ? 'bg-green-500/20 border-green-500/50 text-green-500' : 'bg-red-500/20 border-red-500/50 text-red-500'
-          }`}>
-             <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-             <span className="text-[10px] font-black uppercase tracking-widest">{isConnected ? 'Relay Linked' : 'Disconnected'}</span>
+        {isConnected && frameCount === 0 && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
+            <Video size={40} className="text-slate-600 mb-4 animate-bounce" />
+            <p className="text-slate-400 font-bold tracking-tighter uppercase">Waiting for Robot Video Stream</p>
+            <p className="text-[8px] text-slate-500 mt-2 font-mono">{robotId} :: {sessionId}</p>
           </div>
-          {peerStatus.robot && (
-            <div className="bg-primary/20 border border-primary/50 text-primary px-3 py-1.5 rounded-full backdrop-blur-md text-[10px] font-black uppercase tracking-widest">
-              Live Feed
+        )}
+
+        {/* HUD Overlay */}
+        <div className="absolute top-6 left-6 flex gap-3 pointer-events-none">
+          <div className="bg-black/60 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-3">
+            <div className={`w-2 h-2 rounded-full ${frameCount > 0 ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+            <span className="text-[10px] font-black uppercase tracking-widest text-white">
+              {frameCount > 0 ? 'Live Feed Active' : 'No Data'}
+            </span>
+          </div>
+          {frameCount > 0 && (
+            <div className="bg-primary/20 border border-primary/50 px-4 py-2 rounded-full backdrop-blur-md flex items-center gap-2">
+               <Activity size={12} className="text-primary" />
+               <span className="text-[10px] font-mono text-primary font-bold">
+                 {Math.round(1000 / (Date.now() - lastFrameTime + 1))} FPS
+               </span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Control Overlay */}
-      <div className="p-8 border-t border-white/5 bg-zinc-950">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-           <button
-             onMouseDown={() => sendCommand('MOVE', { dir: 'F' })}
-             onMouseUp={() => sendCommand('STOP')}
-             className="p-4 bg-white/5 hover:bg-primary hover:text-black rounded-2xl border border-white/10 transition-all font-black text-[10px] uppercase tracking-widest"
-           >
-             Drive Fwd
-           </button>
-           <button
-             onClick={() => sendCommand('ATTACHMENT_ACTION', { action: 'START' })}
-             className="p-4 bg-white/5 hover:bg-primary hover:text-black rounded-2xl border border-white/10 transition-all font-black text-[10px] uppercase tracking-widest"
-           >
-             Actuator Start
-           </button>
-           <button
-             onClick={() => sendCommand('MISSION', { action: 'AUTO_START' })}
-             className="p-4 bg-white/5 hover:bg-primary hover:text-black rounded-2xl border border-white/10 transition-all font-black text-[10px] uppercase tracking-widest"
-           >
-             Auto Mission
-           </button>
-           <button
-             onClick={() => sendCommand('STOP_ALL')}
-             className="p-4 bg-destructive/20 border border-destructive/50 text-destructive hover:bg-destructive hover:text-white rounded-2xl transition-all font-black text-[10px] uppercase tracking-widest"
-           >
-             E-Stop
-           </button>
-        </div>
-
-        <div className="flex justify-between items-center text-slate-500">
-           <div className="flex gap-4">
-              <div>
-                <p className="text-[8px] font-black uppercase tracking-widest">Robot ID</p>
-                <p className="text-xs font-bold text-white">{robotId}</p>
-              </div>
-              <div>
-                <p className="text-[8px] font-black uppercase tracking-widest">Session</p>
-                <p className="text-xs font-bold text-white">{sessionId}</p>
-              </div>
-           </div>
-           <div className="text-right">
-              <p className="text-[8px] font-black uppercase tracking-widest">Data Stream</p>
-              <p className="text-[10px] font-mono text-primary">WebRTC Relay Active</p>
-           </div>
-        </div>
+      {/* Footer Stats */}
+      <div className="p-6 bg-zinc-950 border-t border-white/5 flex justify-between items-center">
+         <div className="flex gap-6">
+            <div>
+               <p className="text-[8px] font-black uppercase text-slate-500 mb-1">Frames Rx</p>
+               <p className="text-lg font-black text-white font-mono">{frameCount}</p>
+            </div>
+            <div>
+               <p className="text-[8px] font-black uppercase text-slate-500 mb-1">Bitrate</p>
+               <p className="text-lg font-black text-white font-mono">{frameCount > 0 ? 'High' : '--'}</p>
+            </div>
+         </div>
+         <div className="text-right">
+            <p className="text-[8px] font-black uppercase text-slate-500 mb-1">Signal Path</p>
+            <p className="text-[10px] font-bold text-primary italic">Cloudflare Edge + DO</p>
+         </div>
       </div>
     </div>
   )
