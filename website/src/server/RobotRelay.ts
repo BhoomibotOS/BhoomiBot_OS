@@ -22,7 +22,11 @@ export class RobotRelay {
     ws.addEventListener('message', async (msg) => {
       try {
         const meta = this.sessions.get(ws);
+
+        // Handshake phase: only process text HELLO messages
         if (!meta) {
+          if (typeof msg.data !== 'string') return;
+
           const hello = JSON.parse(msg.data);
           if (hello.type === 'HELLO') {
             const p = JSON.parse(hello.payload || '{}');
@@ -34,16 +38,27 @@ export class RobotRelay {
           }
           return;
         }
-        // Relay to others
+
+        // Relay phase: Forward binary or text to others in the same session
         for (const [peer, peerMeta] of this.sessions.entries()) {
           if (peer !== ws && peerMeta.robotId === meta.robotId && peerMeta.session === meta.session) {
-            peer.send(msg.data);
+            try {
+              peer.send(msg.data);
+            } catch (e) {
+              this.sessions.delete(peer);
+            }
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error('[DO Error]', e);
+      }
     });
 
     ws.addEventListener('close', () => {
+      this.sessions.delete(ws);
+    });
+
+    ws.addEventListener('error', () => {
       this.sessions.delete(ws);
     });
   }
