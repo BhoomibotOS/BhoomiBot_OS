@@ -1,19 +1,20 @@
-// BhoomiBot RobotRelay v7 - High-Reliability Implementation
+// BhoomiBot RobotRelay v8 - Universal High-Stability Implementation
 export class RobotRelay {
   constructor(state, env) {
     this.state = state;
     this.env = env;
-    this.sessions = new Map(); // ws -> meta
+    this.sessions = new Map(); // Store connected WebSockets and their metadata
   }
 
   async fetch(request) {
+    // Only handle WebSocket upgrades
     if (request.headers.get("Upgrade") !== "websocket") {
-      return new Response("Relay Engine Active", { status: 200 });
+      return new Response("BhoomiBot Relay Engine is Running.", { status: 200 });
     }
 
+    // Standard Cloudflare WebSocket pairing
     const pair = new WebSocketPair();
-    const client = pair[0];
-    const server = pair[1];
+    const [client, server] = [pair[0], pair[1]];
 
     await this.handleSession(server);
 
@@ -30,77 +31,44 @@ export class RobotRelay {
       try {
         const meta = this.sessions.get(ws);
 
-        // 1. Handshake Phase
+        // 1. Handshake Phase: Register the device
         if (!meta) {
           if (typeof msg.data !== "string") return;
-          const hello = JSON.parse(msg.data);
-          if (hello.type === "HELLO") {
-            const p = JSON.parse(hello.payload || "{}");
-            const newMeta = {
-              robotId: hello.robotId || "default",
-              session: p.session || "",
-              role: p.role || "OPERATOR",
-            };
-            this.sessions.set(ws, newMeta);
-            console.log(`[Relay] Handshake: ${newMeta.role} joined ${newMeta.robotId}`);
-            this.broadcastPeerStatus(newMeta.robotId, newMeta.session);
+          const data = JSON.parse(msg.data);
+
+          if (data.type === "HELLO") {
+            const payload = typeof data.payload === 'string' ? JSON.parse(data.payload) : (data.payload || {});
+            this.sessions.set(ws, {
+              robotId: data.robotId || "default",
+              session: payload.session || "",
+              role: payload.role || "OPERATOR",
+            });
+            console.log(`[Relay] Handshake Success: ${data.robotId}`);
           }
           return;
         }
 
-        // 2. Relay Phase (Binary Video or JSON Commands)
+        // 2. Relay Phase: Forward the packet (Binary Video or JSON Command)
+        // We broadcast to everyone in the same room (robotId + session)
         for (const [peer, peerMeta] of this.sessions.entries()) {
-          if (
-            peer !== ws &&
-            peerMeta.robotId === meta.robotId &&
-            peerMeta.session === meta.session
-          ) {
-            peer.send(msg.data);
+          if (peer !== ws && peerMeta.robotId === meta.robotId && peerMeta.session === meta.session) {
+            try {
+              peer.send(msg.data);
+            } catch (e) {
+              this.sessions.delete(peer);
+            }
           }
         }
       } catch (err) {
-        console.error("DO Error:", err.message);
+        console.error("Relay Message Error:", err.message);
       }
     });
 
-    const cleanup = () => {
-      const meta = this.sessions.get(ws);
-      if (meta) {
-        this.sessions.delete(ws);
-        this.broadcastPeerStatus(meta.robotId, meta.session);
-        console.log(`[Relay] ${meta.role} left ${meta.robotId}`);
-      }
+    const closeHandler = () => {
+      this.sessions.delete(ws);
     };
 
-    ws.addEventListener("close", cleanup);
-    ws.addEventListener("error", cleanup);
-  }
-
-  broadcastPeerStatus(robotId, session) {
-    let hasRobot = false;
-    let hasOperator = false;
-
-    for (const meta of this.sessions.values()) {
-      if (meta.robotId === robotId && meta.session === session) {
-        if (meta.role === "ROBOT") hasRobot = true;
-        if (meta.role === "OPERATOR") hasOperator = true;
-      }
-    }
-
-    const statusMsg = JSON.stringify({
-      type: "PEER_STATUS",
-      ts: Date.now(),
-      payload: JSON.stringify({ robot: hasRobot, operator: hasOperator }),
-    });
-
-    for (const [ws, meta] of this.sessions.entries()) {
-      if (meta.robotId === robotId && meta.session === session) {
-        try {
-          ws.send(statusMsg);
-        } catch (e) {
-          this.sessions.delete(ws);
-        }
-      }
-    }
+    ws.addEventListener("close", closeHandler);
+    ws.addEventListener("error", closeHandler);
   }
 }
