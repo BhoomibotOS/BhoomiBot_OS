@@ -165,49 +165,27 @@ class WebSocketLiveLinkClient(
         val opened = CompletableDeferred<Boolean>()
         val closed = CompletableDeferred<Unit>()
         
-        // HARDCODED OVERRIDE FOR TESTING
-        val HARDCODED_URL = "wss://bhoomibot-os.madhumohan-contact.workers.dev/api/relay"
-        val HARDCODED_ID = "BHOOMI-001"
+        // FINAL HARDCODED URL FOR CLOUDFLARE
+        val TARGET_URL = "wss://bhoomibot-os.madhumohan-contact.workers.dev/api/relay?robotId=BHOOMI-001"
         
-        // Normalize URL and append Robot ID for Cloudflare DO routing
-        var url = normalizeToWebSocketUrl(HARDCODED_URL)
+        Log.d(TAG, "[RELAY] Attempting force-connect to: $TARGET_URL")
         
-        // Auto-fix missing project prefix if hitting madhumohan-contact.workers.dev
-        if (url.contains("madhumohan-contact.workers.dev") && !url.contains("bhoomibot-os")) {
-            url = url.replace("madhumohan-contact.workers.dev", "bhoomibot-os.madhumohan-contact.workers.dev")
-        }
-
-        // Remove trailing slash
-        if (url.endsWith("/")) {
-            url = url.substring(0, url.length - 1)
-        }
-
-        if (!url.contains("?")) {
-            url += "?robotId=$HARDCODED_ID"
-        }
-
-        val parsed = runCatching { URI(url) }.getOrNull()
-        Log.d(TAG, "[RELAY] Attempting relay connection to $url")
-        
-        if (!url.startsWith("ws://") && !url.startsWith("wss://")) {
-            Log.e(TAG, "[RELAY] ERROR: URL scheme invalid: '$url'")
-            _state.value = LiveConnectionState.ERROR
-            return false
-        }
         val request = try {
-            Request.Builder().url(url).build()
-        } catch (_: IllegalArgumentException) {
-            // Malformed URL that passed the prefix check (e.g. "ws://").
-            Log.e(TAG, "[RELAY] ERROR: malformed URL: '$url'")
+            Request.Builder()
+                .url(TARGET_URL)
+                .addHeader("User-Agent", "BhoomiBot-Robot-App")
+                .build()
+        } catch (e: Exception) {
+            Log.e(TAG, "[RELAY] URL Build Error: ${e.message}")
             _state.value = LiveConnectionState.ERROR
             return false
         }
-        Log.d(TAG, "[RELAY] Opening WebSocket — headers=${request.headers}")
+
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                Log.d(TAG, "[RELAY] CONNECTED url=$url")
+                Log.d(TAG, "[RELAY] PHYSICAL LINK OPEN")
                 _lastError.value = null
-                sendHello() // announce role + session so the relay can pair us
+                sendHello()
                 _state.value = LiveConnectionState.CONNECTED
                 opened.complete(true)
             }
@@ -242,7 +220,7 @@ class WebSocketLiveLinkClient(
             // Network/protocol error: treat exactly like a close so backoff kicks in.
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 val reason = t.message ?: "unknown error"
-                Log.e(TAG, "[RELAY] ERROR url=$url msg=$reason responseCode=${response?.code}", t)
+                Log.e(TAG, "[RELAY] FAILURE msg=$reason responseCode=${response?.code}", t)
                 _lastError.value = "WS failed: $reason${if (response != null) " (HTTP ${response.code})" else ""}"
                 if (!opened.isCompleted) opened.complete(false)
                 if (!closed.isCompleted) closed.complete(Unit)
@@ -257,20 +235,19 @@ class WebSocketLiveLinkClient(
         }
     }
 
-    // The first message on every connection.
     private fun sendHello() {
-        // HARDCODED FOR TESTING
-        val HARDCODED_ID = "BHOOMI-001"
-        val HARDCODED_SESSION = "123"
-
+        // FORCE ROLE AS ROBOT FOR THIS TEST
         val payload = org.json.JSONObject().apply {
-            put("role", config.role.name)
-            put("session", HARDCODED_SESSION)
+            put("role", "ROBOT")
+            put("session", "123")
         }.toString()
+        
+        Log.d(TAG, "[RELAY] SENDING HANDSHAKE: $payload")
+        
         send(
             LiveEnvelope(
                 type = LiveMessageType.HELLO.code,
-                robotId = HARDCODED_ID,
+                robotId = "BHOOMI-001",
                 ts = System.currentTimeMillis(),
                 payload = payload
             )

@@ -1,57 +1,59 @@
-// BhoomiBot RobotRelay v9 - High-Visibility Connector
+// BhoomiBot RobotRelay v11 - High-Performance Cloud Bridge
 export class RobotRelay {
   constructor(state, env) {
     this.state = state;
     this.env = env;
-    this.sessions = new Map();
+    this.sessions = new Map(); // ws -> { robotId, session, role }
   }
 
   async fetch(request) {
     const upgradeHeader = request.headers.get("Upgrade");
     if (upgradeHeader !== "websocket") {
-      return new Response("Relay Engine v9 Online", { status: 200 });
+      const active = Array.from(this.sessions.values()).map(m => `${m.role}:${m.robotId}`).join(", ");
+      return new Response("Relay Active. Connected: " + (active || "None"), { status: 200 });
     }
 
-    const pair = new WebSocketPair();
-    const [client, server] = [pair[0], pair[1]];
-    await this.handleSession(server);
+    const [client, server] = Object.values(new WebSocketPair());
+    server.accept();
+    this.handleSession(server);
 
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  async handleSession(ws) {
-    ws.accept();
-
+  handleSession(ws) {
     ws.addEventListener("message", async (msg) => {
       try {
         const meta = this.sessions.get(ws);
 
+        // 1. Handshake Phase
         if (!meta) {
           if (typeof msg.data !== "string") return;
-          const data = JSON.parse(msg.data);
+          const envelope = JSON.parse(msg.data);
 
-          if (data.type === "HELLO") {
-            const p = typeof data.payload === 'string' ? JSON.parse(data.payload) : (data.payload || {});
+          if (envelope.type === "HELLO") {
+            const payload = typeof envelope.payload === 'string' ? JSON.parse(envelope.payload) : (envelope.payload || {});
             const newMeta = {
-              robotId: data.robotId || "default",
-              session: p.session || "",
-              role: p.role || "OPERATOR",
+              robotId: envelope.robotId || "BHOOMI-001",
+              session: payload.session || "123",
+              role: payload.role || "OPERATOR",
             };
             this.sessions.set(ws, newMeta);
-            console.log(`[Relay] ${newMeta.role} CONNECTED: ${newMeta.robotId}`);
-
-            // Tell everyone that a new device joined
+            console.log(`[Relay] Handshake: ${newMeta.role} (${newMeta.robotId})`);
             this.broadcastStatus(newMeta.robotId, newMeta.session);
           }
           return;
         }
 
-        // Forward video/commands
-        for (const [peer, peerMeta] of this.sessions.entries()) {
+        // 2. Relay Phase (Binary Frames or JSON Commands)
+        this.sessions.forEach((peerMeta, peer) => {
           if (peer !== ws && peerMeta.robotId === meta.robotId && peerMeta.session === meta.session) {
-            peer.send(msg.data);
+            try {
+              peer.send(msg.data);
+            } catch (e) {
+              this.sessions.delete(peer);
+            }
           }
-        }
+        });
       } catch (err) {
         console.error("Relay Error:", err.message);
       }
@@ -80,10 +82,10 @@ export class RobotRelay {
       payload: JSON.stringify({ robot: hasRobot })
     });
 
-    for (const [ws, m] of this.sessions.entries()) {
-      if (m.robotId === robotId && m.session === session) {
-        try { ws.send(msg); } catch(e) {}
+    this.sessions.forEach((meta, ws) => {
+      if (meta.robotId === robotId && meta.session === session) {
+        try { ws.send(msg); } catch (e) {}
       }
-    }
+    });
   }
 }
