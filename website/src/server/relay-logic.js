@@ -1,4 +1,4 @@
-// @ts-nocheck
+// BhoomiBot RobotRelay - Ported from server.js
 export class RobotRelay {
   constructor(state, env) {
     this.state = state;
@@ -14,7 +14,7 @@ export class RobotRelay {
       await this.handleSession(server);
       return new Response(null, { status: 101, webSocket: client });
     }
-    return new Response("Durable Object Active", { status: 200 });
+    return new Response("RobotRelay Active", { status: 200 });
   }
 
   async handleSession(ws) {
@@ -22,11 +22,8 @@ export class RobotRelay {
     ws.addEventListener('message', async (msg) => {
       try {
         const meta = this.sessions.get(ws);
-
-        // Handshake phase: only process text HELLO messages
         if (!meta) {
           if (typeof msg.data !== 'string') return;
-
           const hello = JSON.parse(msg.data);
           if (hello.type === 'HELLO') {
             const p = JSON.parse(hello.payload || '{}');
@@ -38,28 +35,14 @@ export class RobotRelay {
           }
           return;
         }
-
-        // Relay phase: Forward binary or text to others in the same session
         for (const [peer, peerMeta] of this.sessions.entries()) {
           if (peer !== ws && peerMeta.robotId === meta.robotId && peerMeta.session === meta.session) {
-            try {
-              peer.send(msg.data);
-            } catch (e) {
-              this.sessions.delete(peer);
-            }
+            try { peer.send(msg.data); } catch (e) { this.sessions.delete(peer); }
           }
         }
-      } catch (e) {
-        console.error('[DO Error]', e);
-      }
+      } catch (e) { console.error('[Relay Error]', e); }
     });
-
-    ws.addEventListener('close', () => {
-      this.sessions.delete(ws);
-    });
-
-    ws.addEventListener('error', () => {
-      this.sessions.delete(ws);
-    });
+    ws.addEventListener('close', () => this.sessions.delete(ws));
+    ws.addEventListener('error', () => this.sessions.delete(ws));
   }
 }
