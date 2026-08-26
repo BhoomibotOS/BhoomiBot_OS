@@ -164,18 +164,24 @@ class WebSocketLiveLinkClient(
     private suspend fun openOnce(): Boolean {
         val opened = CompletableDeferred<Boolean>()
         val closed = CompletableDeferred<Unit>()
-        // Accept a user-facing http(s):// relay address too: normalize to ws(s)://
-        // so a relay pasted as its https site URL still opens a valid WebSocket.
-        // This makes the transport resilient even if a caller forgot to normalize.
-        val rawUrl = config.serverUrl.trim()
-        val url = normalizeToWebSocketUrl(rawUrl)
+        
+        // Normalize URL and append Robot ID for Cloudflare DO routing
+        var url = normalizeToWebSocketUrl(config.serverUrl.trim())
+        
+        // Remove trailing slash if present to avoid 404s on the edge
+        if (url.endsWith("/")) {
+            url = url.substring(0, url.length - 1)
+        }
+
+        if (!url.contains("?")) {
+            url += "?robotId=${config.robotId}"
+        }
+
         val parsed = runCatching { URI(url) }.getOrNull()
-        Log.d(TAG, "[RELAY] Attempting relay connection")
-        Log.d(TAG, "[RELAY] final URL=$url (raw='$rawUrl') protocol=${parsed?.scheme} host=${parsed?.host} path=${parsed?.path ?: "/"}")
-        // Validate the scheme up front. A bad URL is a terminal config error, not
-        // something retrying will fix, so go straight to ERROR and bail.
+        Log.d(TAG, "[RELAY] Attempting relay connection to $url")
+        
         if (!url.startsWith("ws://") && !url.startsWith("wss://")) {
-            Log.e(TAG, "[RELAY] ERROR: URL scheme is not ws(s):// — cannot open WebSocket: '$url'")
+            Log.e(TAG, "[RELAY] ERROR: URL scheme invalid: '$url'")
             _state.value = LiveConnectionState.ERROR
             return false
         }
@@ -282,6 +288,7 @@ private fun normalizeToWebSocketUrl(url: String): String {
     return when {
         lower.startsWith("https://") -> "wss://" + trimmed.substring("https://".length)
         lower.startsWith("http://") -> "ws://" + trimmed.substring("http://".length)
-        else -> trimmed
+        lower.startsWith("ws://") || lower.startsWith("wss://") -> trimmed
+        else -> "wss://$trimmed" // Default to secure websocket if no scheme provided
     }
 }
