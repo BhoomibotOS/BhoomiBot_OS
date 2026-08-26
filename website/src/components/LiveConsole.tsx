@@ -1,11 +1,16 @@
 "use client"
 
 import React, { useEffect, useRef, useState } from 'react'
-import { Video, Activity, Wifi, AlertCircle, PlayCircle } from 'lucide-react'
+import { Video, Activity, Wifi, AlertCircle, PlayCircle, ShieldAlert, Cpu } from 'lucide-react'
 
 export function LiveConsole({ robotId, sessionId }: any) {
   const [status, setStatus] = useState('offline')
   const [frameCount, setFrameCount] = useState(0)
+  const [isRobotOnline, setIsRobotOnline] = useState(false)
+
+  // HARDCODED OVERRIDE FOR TESTING
+  const TARGET_ROBOT = "BHOOMI-001"
+  const TARGET_SESSION = "123"
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const socketRef = useRef<WebSocket | null>(null)
@@ -13,35 +18,48 @@ export function LiveConsole({ robotId, sessionId }: any) {
   const connect = () => {
     if (socketRef.current) socketRef.current.close()
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/api/relay?robotId=${robotId}`
+    try {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const wsUrl = `${protocol}//${window.location.host}/api/relay?robotId=${TARGET_ROBOT}`
 
-    setStatus('connecting')
-    const ws = new WebSocket(wsUrl)
-    socketRef.current = ws
+      setStatus('connecting')
+      const ws = new WebSocket(wsUrl)
+      socketRef.current = ws
 
-    ws.onopen = () => {
-      // The handshake packet must be a stringified JSON envelope
-      const hello = {
-        type: "HELLO",
-        robotId: robotId,
-        ts: Date.now(),
-        payload: JSON.stringify({ role: "OPERATOR", session: sessionId })
+      ws.onopen = () => {
+        const hello = {
+          type: "HELLO",
+          robotId: TARGET_ROBOT,
+          ts: Date.now(),
+          payload: JSON.stringify({ role: "OPERATOR", session: TARGET_SESSION })
+        }
+        ws.send(JSON.stringify(hello))
+        setStatus('connected')
       }
-      ws.send(JSON.stringify(hello))
-      setStatus('connected')
-    }
 
-    ws.onmessage = (event) => {
-      // If it's a binary blob, it's a video frame!
-      if (event.data instanceof Blob || event.data instanceof ArrayBuffer) {
-        setFrameCount(prev => prev + 1)
-        renderFrame(event.data)
+      ws.onmessage = (event) => {
+        if (event.data instanceof Blob || event.data instanceof ArrayBuffer) {
+          setFrameCount(prev => prev + 1)
+          renderFrame(event.data)
+        } else {
+          try {
+            const msg = JSON.parse(event.data)
+            if (msg.type === 'PEER_STATUS') {
+              const peers = JSON.parse(msg.payload)
+              setIsRobotOnline(peers.robot)
+            }
+          } catch(e) {}
+        }
       }
-    }
 
-    ws.onerror = () => setStatus('error')
-    ws.onclose = () => setStatus('offline')
+      ws.onerror = () => setStatus('error')
+      ws.onclose = () => {
+        setStatus('offline')
+        setIsRobotOnline(false)
+      }
+    } catch (e: any) {
+      setStatus('error')
+    }
   }
 
   const renderFrame = (data: any) => {
@@ -64,7 +82,7 @@ export function LiveConsole({ robotId, sessionId }: any) {
       <div className="relative flex-1 bg-black flex items-center justify-center">
         <canvas ref={canvasRef} width={1280} height={720} className="w-full h-full object-contain" />
 
-        {status !== 'connected' && (
+        {status === 'offline' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
             <button
               onClick={connect}
@@ -72,22 +90,37 @@ export function LiveConsole({ robotId, sessionId }: any) {
             >
               <PlayCircle size={20} /> Establish Video Link
             </button>
+            <p className="text-slate-500 text-[10px] mt-4 font-mono uppercase">TEST MODE: {TARGET_ROBOT}</p>
           </div>
+        )}
+
+        {status === 'connecting' && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60">
+            <Wifi className="text-primary animate-pulse mb-4" size={40} />
+            <p className="text-white font-bold uppercase tracking-widest text-sm">Connecting...</p>
+          </div>
+        )}
+
+        {!isRobotOnline && status === 'connected' && (
+           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
+             <ShieldAlert className="text-yellow-500 mb-4 animate-pulse" size={40} />
+             <p className="text-white font-bold uppercase tracking-widest text-sm">Waiting for Robot...</p>
+           </div>
         )}
 
         <div className="absolute top-6 left-6">
           <div className="bg-black/60 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-3">
             <div className={`w-2 h-2 rounded-full ${status === 'connected' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
             <span className="text-[10px] font-black uppercase tracking-widest text-white">
-              {status === 'connected' ? 'Relay Linked' : 'Offline'}
+              {status === 'connected' ? 'Relay Active' : 'Offline'}
             </span>
           </div>
         </div>
       </div>
 
-      <div className="p-6 bg-zinc-950 border-t border-white/5 flex justify-between items-center">
+      <div className="p-4 bg-black border-t border-white/5 flex justify-between items-center">
          <div>
-            <p className="text-[8px] font-black uppercase text-slate-500 mb-1">Frames Received</p>
+            <p className="text-[8px] font-black uppercase text-slate-500 mb-1">Frames Rx</p>
             <p className="text-lg font-black text-white font-mono">{frameCount}</p>
          </div>
       </div>

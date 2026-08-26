@@ -4,9 +4,9 @@ import com.bhoomibot.os.model.DeviceRole
 
 /** Everything needed to open a live-link session on the relay server. */
 data class ConnectionConfig(
-    val serverUrl: String = "",
-    val robotId: String = "",
-    val sessionCode: String = "",
+    val serverUrl: String = "wss://bhoomibot-os.madhumohan-contact.workers.dev/api/relay",
+    val robotId: String = "BHOOMI-001",
+    val sessionCode: String = "123",
     val role: DeviceRole = DeviceRole.OPERATOR,
     val autoReconnect: Boolean = true,
     val videoFps: Int = 12,

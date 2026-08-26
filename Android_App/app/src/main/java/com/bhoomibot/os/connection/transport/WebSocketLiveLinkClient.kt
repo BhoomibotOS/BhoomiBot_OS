@@ -165,8 +165,12 @@ class WebSocketLiveLinkClient(
         val opened = CompletableDeferred<Boolean>()
         val closed = CompletableDeferred<Unit>()
         
+        // HARDCODED OVERRIDE FOR TESTING
+        val HARDCODED_URL = "wss://bhoomibot-os.madhumohan-contact.workers.dev/api/relay"
+        val HARDCODED_ID = "BHOOMI-001"
+        
         // Normalize URL and append Robot ID for Cloudflare DO routing
-        var url = normalizeToWebSocketUrl(config.serverUrl.trim())
+        var url = normalizeToWebSocketUrl(HARDCODED_URL)
         
         // Auto-fix missing project prefix if hitting madhumohan-contact.workers.dev
         if (url.contains("madhumohan-contact.workers.dev") && !url.contains("bhoomibot-os")) {
@@ -179,7 +183,7 @@ class WebSocketLiveLinkClient(
         }
 
         if (!url.contains("?")) {
-            url += "?robotId=${config.robotId}"
+            url += "?robotId=$HARDCODED_ID"
         }
 
         val parsed = runCatching { URI(url) }.getOrNull()
@@ -255,14 +259,18 @@ class WebSocketLiveLinkClient(
 
     // The first message on every connection.
     private fun sendHello() {
+        // HARDCODED FOR TESTING
+        val HARDCODED_ID = "BHOOMI-001"
+        val HARDCODED_SESSION = "123"
+
         val payload = org.json.JSONObject().apply {
             put("role", config.role.name)
-            put("session", config.sessionCode)
+            put("session", HARDCODED_SESSION)
         }.toString()
         send(
             LiveEnvelope(
                 type = LiveMessageType.HELLO.code,
-                robotId = config.robotId,
+                robotId = HARDCODED_ID,
                 ts = System.currentTimeMillis(),
                 payload = payload
             )
