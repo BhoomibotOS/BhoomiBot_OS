@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:cf": "npx @cloudflare/next-on-pages && cat src/server/relay-logic.js >> .vercel/output/static/_worker.js/index.js",
+    "build:cf": "npx @cloudflare/next-on-pages && node scripts/stitch-worker.js",
     "start": "next start",
     "lint": "eslint"
   },
