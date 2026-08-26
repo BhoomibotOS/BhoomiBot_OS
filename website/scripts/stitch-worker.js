@@ -5,31 +5,62 @@ const workerPath = path.resolve(__dirname, '../.vercel/output/static/_worker.js/
 const logicPath = path.resolve(__dirname, '../src/server/relay-logic.js');
 
 try {
-  console.log('--- Stitching RobotRelay to Next.js Worker ---');
+  console.log('--- BhoomiBot: Advanced Worker Stitching ---');
 
   if (!fs.existsSync(workerPath)) {
-    console.error('Error: Built Next.js worker not found at ' + workerPath);
+    console.error('Build file not found at: ' + workerPath);
     process.exit(1);
   }
 
-  const workerContent = fs.readFileSync(workerPath, 'utf8');
-  const logicContent = fs.readFileSync(logicPath, 'utf8');
+  let content = fs.readFileSync(workerPath, 'utf8');
 
-  // Check if logic is already appended
-  if (workerContent.includes('class RobotRelay')) {
-    console.log('RobotRelay already exists in worker bundle. Skipping.');
-  } else {
-    // Append logic to the end of the file
-    fs.appendFileSync(workerPath, '\n\n' + logicContent);
-    console.log('Successfully stitched RobotRelay to index.js');
+  // 1. Remove the existing default export so we can wrap it
+  content = content.replace(/export\s+default\s+([^;]+);/, 'const nextWorker = $1;');
+
+  // 2. Add our Durable Object logic
+  const relayLogic = fs.readFileSync(logicPath, 'utf8');
+
+  // 3. Create the wrapped worker
+  const wrappedWorker = `
+${content}
+
+${relayLogic}
+
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+
+    // Diagnostic endpoint
+    if (url.pathname === '/__debug') {
+      return new Response(JSON.stringify({
+        ready: !!nextWorker,
+        hasRelay: !!env.RELAY,
+        time: new Date().toISOString()
+      }), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // Direct Relay Routing (Bypass Next.js for speed)
+    if (url.pathname === '/api/relay') {
+      const id = env.RELAY.idFromName(url.searchParams.get('robotId') || 'default');
+      return env.RELAY.get(id).fetch(request);
+    }
+
+    try {
+      return await nextWorker.fetch(request, env, ctx);
+    } catch (e) {
+      return new Response("BhoomiBot Runtime Error: " + e.message + "\\n\\nStack: " + e.stack, { status: 500 });
+    }
   }
+};
+`;
 
-  // Create .assetsignore in the same directory to prevent wrangler upload errors
-  const ignorePath = path.resolve(__dirname, '../.vercel/output/static/.assetsignore');
-  fs.writeFileSync(ignorePath, '_worker.js\n');
-  console.log('Created .assetsignore for Wrangler.');
+  fs.writeFileSync(workerPath, wrappedWorker);
+  console.log('Successfully stitched and wrapped Next.js with RobotRelay.');
+
+  // Ensure .assetsignore exists
+  fs.writeFileSync(path.resolve(__dirname, '../.vercel/output/static/.assetsignore'), '_worker.js\n');
 
 } catch (err) {
-  console.error('Stitching Failed:', err.message);
+  console.error('Stitching Failed:', err);
   process.exit(1);
 }
