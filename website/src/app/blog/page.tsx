@@ -4,8 +4,6 @@ import Image from "next/image"
 import Link from "next/link"
 import { Calendar, User, ArrowRight, Tag } from "lucide-react"
 
-export const runtime = 'edge';
-
 const posts = [
   {
     title: "BhoomiBot: The Future of Autonomous Farming in India",

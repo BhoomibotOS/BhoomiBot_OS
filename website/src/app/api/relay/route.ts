@@ -1,10 +1,8 @@
-// @ts-nocheck
-export const runtime = 'edge';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 export async function GET(request: Request) {
   try {
-    // We use the global BHOOMI_ENV we will inject in the worker wrapper
-    const env = (globalThis as any).BHOOMI_ENV;
+    const { env } = getCloudflareContext();
 
     if (!env || !env.RELAY) {
       return new Response(JSON.stringify({
@@ -21,6 +19,7 @@ export async function GET(request: Request) {
 
     return obj.fetch(request);
   } catch (e) {
-    return new Response(`Relay Logic Error: ${e.message}`, { status: 500 });
+    const message = e instanceof Error ? e.message : "Unknown relay error";
+    return new Response(`Relay Logic Error: ${message}`, { status: 500 });
   }
 }

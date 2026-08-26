@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -8,11 +9,6 @@ const nextConfig: NextConfig = {
     // your project has type errors.
     // !! WARN !!
     ignoreBuildErrors: true,
-  },
-  eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
-    ignoreDuringBuilds: true,
   },
   experimental: {
     optimizePackageImports: [
@@ -25,3 +21,8 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+// Wrangler's binding bridge is only needed by `next dev`.
+if (process.env.NODE_ENV === "development") {
+  initOpenNextCloudflareForDev();
+}

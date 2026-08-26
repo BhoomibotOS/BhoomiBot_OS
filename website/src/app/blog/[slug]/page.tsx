@@ -3,8 +3,6 @@ import Image from "next/image"
 import Link from "next/link"
 import { ArrowLeft, Calendar, User, Share2 } from "lucide-react"
 
-export const runtime = 'edge';
-
 export default function BlogPost({ params }: { params: { slug: string } }) {
   return (
     <main className="pt-32 pb-24 min-h-screen bg-white dark:bg-black">
