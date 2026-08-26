@@ -168,7 +168,12 @@ class WebSocketLiveLinkClient(
         // Normalize URL and append Robot ID for Cloudflare DO routing
         var url = normalizeToWebSocketUrl(config.serverUrl.trim())
         
-        // Remove trailing slash if present to avoid 404s on the edge
+        // Auto-fix missing project prefix if hitting madhumohan-contact.workers.dev
+        if (url.contains("madhumohan-contact.workers.dev") && !url.contains("bhoomibot-os")) {
+            url = url.replace("madhumohan-contact.workers.dev", "bhoomibot-os.madhumohan-contact.workers.dev")
+        }
+
+        // Remove trailing slash
         if (url.endsWith("/")) {
             url = url.substring(0, url.length - 1)
         }
