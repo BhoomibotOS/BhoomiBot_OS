@@ -1,9 +1,14 @@
 name = "bhoomibot-os"
+main = "src/server/entry.ts"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
 [observability.logs]
 enabled = true
+
+[assets]
+directory = ".vercel/output/static"
+binding = "ASSETS"
 
 [durable_objects]
 bindings = [{name = "RELAY", class_name = "RobotRelay"}]
