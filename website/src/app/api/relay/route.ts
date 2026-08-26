@@ -1,26 +1,26 @@
 // @ts-nocheck
-import { getRequestContext } from '@cloudflare/next-on-pages';
-
 export const runtime = 'edge';
 
 export async function GET(request: Request) {
   try {
-    const { env } = getRequestContext();
+    // We use the global BHOOMI_ENV we will inject in the worker wrapper
+    const env = (globalThis as any).BHOOMI_ENV;
 
-    // Safety check for binding
     if (!env || !env.RELAY) {
-      return new Response("RELAY binding missing in Next.js context", { status: 500 });
+      return new Response(JSON.stringify({
+        error: "Relay system initializing",
+        details: "Durable Object binding not found in global context."
+      }), { status: 503, headers: {'Content-Type': 'application/json'} });
     }
 
     const { searchParams } = new URL(request.url);
     const robotId = searchParams.get('robotId') || 'default';
 
-    // Route directly to the Durable Object
     const id = env.RELAY.idFromName(robotId);
     const obj = env.RELAY.get(id);
 
     return obj.fetch(request);
   } catch (e) {
-    return new Response(`Relay Error: ${e.message}`, { status: 500 });
+    return new Response(`Relay Logic Error: ${e.message}`, { status: 500 });
   }
 }
