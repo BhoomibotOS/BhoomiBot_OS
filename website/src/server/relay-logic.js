@@ -1,4 +1,4 @@
-// BhoomiBot RobotRelay v6 - Ultra-Standard Implementation
+// BhoomiBot RobotRelay v7 - High-Reliability Implementation
 export class RobotRelay {
   constructor(state, env) {
     this.state = state;
@@ -36,11 +36,14 @@ export class RobotRelay {
           const hello = JSON.parse(msg.data);
           if (hello.type === "HELLO") {
             const p = JSON.parse(hello.payload || "{}");
-            this.sessions.set(ws, {
+            const newMeta = {
               robotId: hello.robotId || "default",
               session: p.session || "",
               role: p.role || "OPERATOR",
-            });
+            };
+            this.sessions.set(ws, newMeta);
+            console.log(`[Relay] Handshake: ${newMeta.role} joined ${newMeta.robotId}`);
+            this.broadcastPeerStatus(newMeta.robotId, newMeta.session);
           }
           return;
         }
@@ -60,7 +63,44 @@ export class RobotRelay {
       }
     });
 
-    ws.addEventListener("close", () => this.sessions.delete(ws));
-    ws.addEventListener("error", () => this.sessions.delete(ws));
+    const cleanup = () => {
+      const meta = this.sessions.get(ws);
+      if (meta) {
+        this.sessions.delete(ws);
+        this.broadcastPeerStatus(meta.robotId, meta.session);
+        console.log(`[Relay] ${meta.role} left ${meta.robotId}`);
+      }
+    };
+
+    ws.addEventListener("close", cleanup);
+    ws.addEventListener("error", cleanup);
+  }
+
+  broadcastPeerStatus(robotId, session) {
+    let hasRobot = false;
+    let hasOperator = false;
+
+    for (const meta of this.sessions.values()) {
+      if (meta.robotId === robotId && meta.session === session) {
+        if (meta.role === "ROBOT") hasRobot = true;
+        if (meta.role === "OPERATOR") hasOperator = true;
+      }
+    }
+
+    const statusMsg = JSON.stringify({
+      type: "PEER_STATUS",
+      ts: Date.now(),
+      payload: JSON.stringify({ robot: hasRobot, operator: hasOperator }),
+    });
+
+    for (const [ws, meta] of this.sessions.entries()) {
+      if (meta.robotId === robotId && meta.session === session) {
+        try {
+          ws.send(statusMsg);
+        } catch (e) {
+          this.sessions.delete(ws);
+        }
+      }
+    }
   }
 }
