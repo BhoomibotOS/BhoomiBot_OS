@@ -1,34 +1,76 @@
+// BhoomiBot RobotRelay v5 - Standard WebSocket Implementation
 export class RobotRelay {
   constructor(state, env) {
     this.state = state;
     this.env = env;
     this.sessions = new Map();
   }
+
   async fetch(request) {
-    if (request.headers.get('Upgrade') === 'websocket') {
-      const [client, server] = Object.values(new WebSocketPair());
-      server.accept();
-      server.addEventListener('message', (msg) => {
-        const meta = this.sessions.get(server);
+    console.log("[Relay] Fetch request received");
+    const upgradeHeader = request.headers.get('Upgrade');
+
+    if (upgradeHeader === 'websocket') {
+      console.log("[Relay] Upgrading to WebSocket...");
+      const pair = new WebSocketPair();
+      const client = pair[0];
+      const server = pair[1];
+
+      await this.handleSession(server);
+
+      return new Response(null, {
+        status: 101,
+        webSocket: client,
+      });
+    }
+
+    return new Response("BhoomiBot Relay is Online and Waiting for WebSockets.", { status: 200 });
+  }
+
+  async handleSession(ws) {
+    ws.accept();
+    console.log("[Relay] WebSocket Accepted");
+
+    ws.addEventListener('message', async (msg) => {
+      try {
+        const meta = this.sessions.get(ws);
+
+        // Handle Handshake
         if (!meta) {
-          try {
-            const hello = JSON.parse(msg.data);
-            if (hello.type === 'HELLO') {
-              const p = JSON.parse(hello.payload || '{}');
-              this.sessions.set(server, { robotId: hello.robotId, session: p.session });
-            }
-          } catch(e) {}
+          console.log("[Relay] Processing Handshake:", msg.data);
+          const hello = JSON.parse(msg.data);
+          if (hello.type === 'HELLO') {
+            const p = JSON.parse(hello.payload || '{}');
+            const sessionMeta = {
+              robotId: hello.robotId || 'default',
+              session: p.session || '',
+              role: p.role || 'OPERATOR'
+            };
+            this.sessions.set(ws, sessionMeta);
+            console.log(`[Relay] Registered: ${sessionMeta.role} for ${sessionMeta.robotId}`);
+          }
           return;
         }
-        this.sessions.forEach((peerMeta, peer) => {
-          if (peer !== server && peerMeta.robotId === meta.robotId && peerMeta.session === meta.session) {
+
+        // Relay packets to other peers in the same room
+        for (const [peer, peerMeta] of this.sessions.entries()) {
+          if (peer !== ws && peerMeta.robotId === meta.robotId && peerMeta.session === meta.session) {
             peer.send(msg.data);
           }
-        });
-      });
-      server.addEventListener('close', () => this.sessions.delete(server));
-      return new Response(null, { status: 101, webSocket: client });
-    }
-    return new Response("Relay Active", { status: 200 });
+        }
+      } catch (e) {
+        console.error("[Relay Internal Error]", e.message);
+      }
+    });
+
+    ws.addEventListener('close', () => {
+      console.log("[Relay] Client Disconnected");
+      this.sessions.delete(ws);
+    });
+
+    ws.addEventListener('error', (e) => {
+      console.error("[Relay Socket Error]", e);
+      this.sessions.delete(ws);
+    });
   }
 }
