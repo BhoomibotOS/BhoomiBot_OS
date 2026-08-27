@@ -53,13 +53,23 @@ export function LiveConsole({ robotId, sessionId }: any) {
           if (msg.type === 'PEER_STATUS') {
             const peers = JSON.parse(msg.payload)
             setIsRobotOnline(peers.robot)
+
+            // If robot just came online, command it to start its camera
+            if (peers.robot) {
+               const startCameraCmd = JSON.stringify({
+                 type: "COMMAND",
+                 robotId: TARGET_ROBOT,
+                 ts: Date.now(),
+                 payload: JSON.stringify({ liveCamera: true, useRearCamera: true })
+               });
+               socketRef.current?.send(startCameraCmd);
+            }
             return
           }
 
           // VIDEO FRAME (Base64)
           if (msg.type === 'VIDEO_FRAME' && msg.payload) {
             setFrameCount(prev => prev + 1)
-            // Convert Base64 string to Blob
             const byteCharacters = atob(msg.payload);
             const byteNumbers = new Array(byteCharacters.length);
             for (let i = 0; i < byteCharacters.length; i++) {

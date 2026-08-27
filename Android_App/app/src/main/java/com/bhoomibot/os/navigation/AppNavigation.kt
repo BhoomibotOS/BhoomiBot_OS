@@ -107,7 +107,16 @@ fun AppNavigation(
             ConnectionOptionsScreen(
                 onBackClick = { navController.popBackStack() },
                 onStart = { role ->
-                    // Logic to start live link with role
+                    // Actually navigate and start the link based on the chosen role
+                    if (role == DeviceRole.ROBOT) {
+                        navController.navigate(AppRoute.RobotHome) {
+                            popUpTo(AppRoute.LiveLinkSettings) { inclusive = true }
+                        }
+                    } else {
+                        navController.navigate(AppRoute.OperatorLive) {
+                            popUpTo(AppRoute.LiveLinkSettings) { inclusive = true }
+                        }
+                    }
                 }
             )
         }

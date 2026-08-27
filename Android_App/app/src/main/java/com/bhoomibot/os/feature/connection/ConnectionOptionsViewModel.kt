@@ -64,6 +64,8 @@ class ConnectionOptionsViewModel(application: Application) : AndroidViewModel(ap
 
     fun setServerUrl(v: String) { _uiState.value = _uiState.value.copy(serverUrl = v.trim()) }
 
+    fun setRole(v: DeviceRole) { _uiState.value = _uiState.value.copy(role = v) }
+
     /** Pick a previously used server URL (from the history chips). */
     fun selectRecentServerUrl(url: String) { setServerUrl(url) }
     fun setRobotId(v: String) { _uiState.value = _uiState.value.copy(robotId = v.trim()) }
@@ -133,6 +135,10 @@ class ConnectionOptionsViewModel(application: Application) : AndroidViewModel(ap
             )
             // Remember this URL for quick re-selection next time (most-recent-first).
             LiveLinkPreferencesStore.addRecentServerUrl(getApplication(), s.normalizedServerUrl)
+            
+            // AI-Fix: Persist the device role as well
+            DevicePreferences.setRole(getApplication(), s.role)
+
             val recents = (listOf(s.normalizedServerUrl) +
                 s.recentServerUrls.filter { it != s.normalizedServerUrl }).take(5)
             _uiState.value = s.copy(saved = true, recentServerUrls = recents)
