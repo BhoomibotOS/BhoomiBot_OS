@@ -44,6 +44,11 @@ export function LiveConsole() {
         if (msg.type === 'PEER_STATUS') {
           const peers = JSON.parse(msg.payload)
           setIsRobotOnline(peers.robot)
+
+          // AI-Fix: If robot joins, force its camera to start immediately
+          if (peers.robot && !isCameraActive) {
+            sendCommand(true, useRearCamera)
+          }
         }
         if (msg.type === 'VIDEO_FRAME' && msg.payload) {
           setFrameCount(prev => prev + 1)

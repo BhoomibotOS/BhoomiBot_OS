@@ -149,21 +149,17 @@ class BhoomiBotService : LifecycleService() {
         val robotRepo = provideRobotRepository(application)
 
         bridgeJob = serviceScope.launch(Dispatchers.Default) {
-            // AI-Fix: Auto-connect the Robot to the Relay
-            // Without this call, the Robot phone opens the repo but never opens the socket.
-            val prefs = com.bhoomibot.os.data.LiveLinkPreferencesStore.preferences(applicationContext).first()
+            // Auto-Connect to the Cloudflare Relay with Hardcoded Room for BHOOMI-001
             liveRepo.connect(com.bhoomibot.os.connection.model.ConnectionConfig(
-                serverUrl = prefs.serverUrl,
-                robotId = prefs.robotId,
-                sessionCode = prefs.sessionCode,
+                serverUrl = "wss://bhoomibot-os.madhumohan-contact.workers.dev/api/relay?robotId=BHOOMI-001",
+                robotId = "BHOOMI-001",
+                sessionCode = "123",
                 role = DeviceRole.ROBOT
             ))
 
-            // AI-Fix: Auto-start the camera broadcast on successful connection
-            isBroadcastActive = true
-            startVision(VideoQuality.MEDIUM, true)
-
             liveRepo.incomingCommands.collect { cmd ->
+                android.util.Log.d("BhoomiBotRelay", "[SERVICE] RECEIVED COMMAND: liveCamera=${cmd.liveCamera}")
+
                 if (cmd.emergencyStop) {
                     robotRepo.sendDriveCommand(com.bhoomibot.os.model.DriveCommand.EMERGENCY_STOP)
                 } else {
