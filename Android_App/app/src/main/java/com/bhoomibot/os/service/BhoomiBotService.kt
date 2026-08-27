@@ -159,6 +159,10 @@ class BhoomiBotService : LifecycleService() {
                 role = DeviceRole.ROBOT
             ))
 
+            // AI-Fix: Auto-start the camera broadcast on successful connection
+            isBroadcastActive = true
+            startVision(VideoQuality.MEDIUM, true)
+
             liveRepo.incomingCommands.collect { cmd ->
                 if (cmd.emergencyStop) {
                     robotRepo.sendDriveCommand(com.bhoomibot.os.model.DriveCommand.EMERGENCY_STOP)

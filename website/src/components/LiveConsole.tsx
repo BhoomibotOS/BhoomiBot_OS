@@ -27,6 +27,18 @@ export function LiveConsole() {
         payload: JSON.stringify({ role: "OPERATOR", session: "123" })
       }))
       setStatus('connected')
+
+      // FORCE START CAMERA COMMAND
+      setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: "COMMAND",
+            robotId: "BHOOMI-001",
+            ts: Date.now(),
+            payload: JSON.stringify({ liveCamera: true, useRearCamera: true })
+          }))
+        }
+      }, 5000);
     }
 
     ws.onmessage = async (event) => {
