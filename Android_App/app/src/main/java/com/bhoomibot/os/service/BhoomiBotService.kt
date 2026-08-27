@@ -19,6 +19,7 @@ import com.bhoomibot.os.repository.provideRobotRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 
 /**
  * BhoomiBotService: The permanent heart of the robot operations.
@@ -148,6 +149,16 @@ class BhoomiBotService : LifecycleService() {
         val robotRepo = provideRobotRepository(application)
 
         bridgeJob = serviceScope.launch(Dispatchers.Default) {
+            // AI-Fix: Auto-connect the Robot to the Relay
+            // Without this call, the Robot phone opens the repo but never opens the socket.
+            val prefs = com.bhoomibot.os.data.LiveLinkPreferencesStore.preferences(applicationContext).first()
+            liveRepo.connect(com.bhoomibot.os.connection.model.ConnectionConfig(
+                serverUrl = prefs.serverUrl,
+                robotId = prefs.robotId,
+                sessionCode = prefs.sessionCode,
+                role = DeviceRole.ROBOT
+            ))
+
             liveRepo.incomingCommands.collect { cmd ->
                 if (cmd.emergencyStop) {
                     robotRepo.sendDriveCommand(com.bhoomibot.os.model.DriveCommand.EMERGENCY_STOP)

@@ -37,18 +37,39 @@ export function LiveConsole({ robotId, sessionId }: any) {
         setStatus('connected')
       }
 
-      ws.onmessage = (event) => {
+      ws.onmessage = async (event) => {
+        // 1. Handle Raw Binary Frames (Hotspot mode)
         if (event.data instanceof Blob || event.data instanceof ArrayBuffer) {
           setFrameCount(prev => prev + 1)
           renderFrame(event.data)
-        } else {
-          try {
-            const msg = JSON.parse(event.data)
-            if (msg.type === 'PEER_STATUS') {
-              const peers = JSON.parse(msg.payload)
-              setIsRobotOnline(peers.robot)
+          return
+        }
+
+        // 2. Handle JSON Messages (Internet mode)
+        try {
+          const msg = JSON.parse(event.data)
+
+          // PEER STATUS
+          if (msg.type === 'PEER_STATUS') {
+            const peers = JSON.parse(msg.payload)
+            setIsRobotOnline(peers.robot)
+            return
+          }
+
+          // VIDEO FRAME (Base64)
+          if (msg.type === 'VIDEO_FRAME' && msg.payload) {
+            setFrameCount(prev => prev + 1)
+            // Convert Base64 string to Blob
+            const byteCharacters = atob(msg.payload);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
             }
-          } catch(e) {}
+            const byteArray = new Uint8Array(byteNumbers);
+            renderFrame(new Blob([byteArray], {type: 'image/jpeg'}));
+          }
+        } catch(e) {
+          console.error("Parse Error:", e)
         }
       }
 
