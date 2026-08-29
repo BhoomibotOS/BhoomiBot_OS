@@ -1,94 +1,85 @@
-// BhoomiBot RobotRelay v13 - Full Peer Status & Command Routing
 export class RobotRelay {
   constructor(state, env) {
     this.state = state;
-    this.env = env;
-    this.sessions = new Map(); // ws -> { robotId, session, role }
+    this.sessions = new Map(); // ws -> { robotId, role, session }
   }
 
   async fetch(request) {
-    if (request.headers.get("Upgrade") !== "websocket") {
-      const active = Array.from(this.sessions.values()).map(m => `${m.role}:${m.robotId}`).join(", ");
-      return new Response("Relay Active. Connected: " + (active || "None"), { status: 200 });
+    const url = new URL(request.url);
+    const upgradeHeader = request.headers.get("Upgrade");
+    if (!upgradeHeader || upgradeHeader !== "websocket") {
+      return new Response("Expected Upgrade: websocket", { status: 426 });
     }
 
-    const pair = new WebSocketPair();
-    const [client, server] = [pair[0], pair[1]];
-    server.accept();
-    this.handleSession(server);
+    const [client, server] = new WebSocketPair();
+    const robotId = url.searchParams.get("robotId") || "BHOOMI-001";
+
+    this.state.acceptWebSocket(server);
+    // Initial role is PENDING until HELLO handshake arrives
+    this.sessions.set(server, { robotId, role: "PENDING", session: "123" });
 
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  handleSession(ws) {
-    ws.addEventListener("message", async (msg) => {
-      try {
-        const meta = this.sessions.get(ws);
+  async webSocketMessage(ws, message) {
+    const meta = this.sessions.get(ws);
+    if (!meta) return;
 
-        // 1. Handshake Phase
-        if (!meta) {
-          if (typeof msg.data !== "string") return;
-          const envelope = JSON.parse(msg.data);
-
-          if (envelope.type === "HELLO") {
-            const payload = typeof envelope.payload === 'string' ? JSON.parse(envelope.payload) : (envelope.payload || {});
-            const newMeta = {
-              robotId: envelope.robotId || "BHOOMI-001",
-              session: payload.session || "123",
-              role: payload.role || "OPERATOR",
-            };
-            this.sessions.set(ws, newMeta);
-            console.log(`[Relay] Handshake: ${newMeta.role} joined ${newMeta.robotId}`);
-            this.broadcastStatus(newMeta.robotId, newMeta.session);
-          }
-          return;
+    // PERFORMANCE OPTIMIZATION: Instant relay for binary (Video Frames)
+    // We check if message is a string. If not, it's a raw JPEG binary frame.
+    // We relay it without parsing JSON to save CPU and reduce lag.
+    if (typeof message !== "string") {
+      this.sessions.forEach((peerMeta, peer) => {
+        if (peer !== ws && peerMeta.robotId === meta.robotId && peerMeta.session === meta.session) {
+          try { peer.send(message); } catch (e) { this.sessions.delete(peer); }
         }
+      });
+      return;
+    }
 
-        // 2. Relay Phase (Binary Frames or JSON Commands)
-        this.sessions.forEach((peerMeta, peer) => {
-          if (peer !== ws && peerMeta.robotId === meta.robotId && peerMeta.session === meta.session) {
-            try {
-              peer.send(msg.data);
-            } catch (e) {
-              this.sessions.delete(peer);
-            }
-          }
-        });
-      } catch (err) {
-        console.error("Relay Error:", err.message);
+    try {
+      const envelope = JSON.parse(message);
+
+      // 1. Handshake Phase
+      if (envelope.type === "HELLO") {
+        const payload = JSON.parse(envelope.payload || "{}");
+        const newMeta = {
+          robotId: envelope.robotId || "BHOOMI-001",
+          session: payload.session || "123",
+          role: payload.role || "OPERATOR",
+        };
+        this.sessions.set(ws, newMeta);
+        console.log(`[Relay] ${newMeta.role} joined session ${newMeta.session} for ${newMeta.robotId}`);
+        this.broadcastStatus(newMeta.robotId, newMeta.session);
+        return;
       }
-    });
 
-    const cleanup = () => {
-      const meta = this.sessions.get(ws);
-      if (meta) {
-        this.sessions.delete(ws);
-        this.broadcastStatus(meta.robotId, meta.session);
-        console.log(`[Relay] ${meta.role} left ${meta.robotId}`);
-      }
-    };
+      // 2. Text Relay Phase (Commands, Telemetry)
+      this.sessions.forEach((peerMeta, peer) => {
+        if (peer !== ws && peerMeta.robotId === meta.robotId && peerMeta.session === meta.session) {
+          try { peer.send(message); } catch (e) { this.sessions.delete(peer); }
+        }
+      });
 
-    ws.addEventListener("close", cleanup);
-    ws.addEventListener("error", cleanup);
+    } catch (err) {
+      console.error("[Relay] JSON Parse Error:", err);
+    }
   }
 
   broadcastStatus(robotId, session) {
     let hasRobot = false;
     let hasOperator = false;
 
-    for (const m of this.sessions.values()) {
-      if (m.robotId === robotId && m.session === session) {
-        if (m.role === "ROBOT") hasRobot = true;
-        if (m.role === "OPERATOR") hasOperator = true;
+    this.sessions.forEach((meta) => {
+      if (meta.robotId === robotId && meta.session === session) {
+        if (meta.role === "ROBOT") hasRobot = true;
+        if (meta.role === "OPERATOR") hasOperator = true;
       }
-    }
+    });
 
     const msg = JSON.stringify({
       type: "PEER_STATUS",
-      payload: JSON.stringify({
-        robot: hasRobot,
-        operator: hasOperator
-      })
+      payload: JSON.stringify({ robot: hasRobot, operator: hasOperator })
     });
 
     this.sessions.forEach((meta, ws) => {
@@ -96,5 +87,14 @@ export class RobotRelay {
         try { ws.send(msg); } catch (e) {}
       }
     });
+  }
+
+  async webSocketClose(ws) {
+    const meta = this.sessions.get(ws);
+    if (meta) {
+      console.log(`[Relay] ${meta.role} left ${meta.robotId}`);
+      this.sessions.delete(ws);
+      this.broadcastStatus(meta.robotId, meta.session);
+    }
   }
 }
