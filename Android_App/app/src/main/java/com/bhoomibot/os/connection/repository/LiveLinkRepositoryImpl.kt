@@ -101,8 +101,10 @@ class LiveLinkRepositoryImpl(
 
     override fun publishFrame(jpeg: ByteArray) {
         val serverUrl = currentServerUrl ?: ""
-        // Use Base64-JSON for secure internet relays (Render/Cloud proxies)
-        if (serverUrl.startsWith("wss://") || serverUrl.contains("onrender.com")) {
+        // PERFORMANCE OPTIMIZATION: Use high-speed raw binary for Cloudflare and Hotspot.
+        // This reduces data usage by 33% and fixes video stuttering.
+        if (serverUrl.contains("onrender.com")) {
+            // Legacy fallback for Render
             val base64 = Base64.encodeToString(jpeg, Base64.NO_WRAP)
             client.send(
                 LiveEnvelope(
@@ -113,7 +115,7 @@ class LiveLinkRepositoryImpl(
                 )
             )
         } else {
-            // Hotspot Mode: Use high-speed raw binary
+            // Cloudflare and Local Hotspot: Send raw bytes
             client.sendFrame(jpeg)
         }
     }

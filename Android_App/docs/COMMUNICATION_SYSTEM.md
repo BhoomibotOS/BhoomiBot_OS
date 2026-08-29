@@ -14,187 +14,84 @@ BhoomiBot implements a dual-path communication architecture supporting both loca
 - `VcuProtocol.kt` - ASCII protocol definitions
 - `ConnectionPreferences.kt` - Connection settings
 
-### 2. Internet Live Link (Operator Mode)
-**Purpose**: Remote operator control via relay server
+### 2. Internet Live Link (Cloudflare Relay)
+**Purpose**: Remote operator control via a Cloudflare Workers relay server.
 
 **Components**:
 - `LiveLinkClient.kt` - Transport abstraction
-- `WebSocketLiveLinkClient.kt` - WebSocket implementation
+- `WebSocketLiveLinkClient.kt` - WebSocket implementation (handles Cloudflare URL formatting)
 - `LiveLinkRepositoryImpl.kt` - Message handling
 - `LiveEnvelope.kt` - Message format
 - `ConnectionConfig.kt` - Session parameters
 
-## Local Communication Flow (Robot Mode)
+---
 
-### ASCII Protocol (VcuProtocol.kt)
-```
-Drive Commands:
-- F = FORWARD
-- B = REVERSE  
-- L = LEFT
-- R = RIGHT
-- S = STOP
-- E = EMERGENCY_STOP
+## The Command Path (Step-by-Step)
 
-Aux Commands:
-- SPD[-100..+100] = Speed percentage
-- PTO0/PTO1 = Power take-off
-- LGT0/LGT1 = Work lights
-- HYD[0..100] = Hydraulic height
-- HRN = Horn pulse
-```
+### Phase 1: Packing (Operator Phone)
+When an operator presses a button (e.g., UP arrow) on the **Manual Screen**:
+1.  The `ManualViewModel` calculates the intent (e.g., "FORWARD at 40% speed").
+2.  It packs these into a single `RobotCommand` JSON object.
+3.  The `LiveLinkRepository` wraps this in a `LiveEnvelope` and sends it to Cloudflare.
 
-### ConnectionManager.kt Flow
-1. User configures connection type (BT/WiFi/AUTO)
-2. `connect()` opens appropriate socket
-3. `send(cmd)` writes ASCII command with newline
-4. `disconnect()` closes socket
+### Phase 2: Relaying (Cloudflare Worker)
+1.  The Cloudflare Worker receives the JSON message.
+2.  It identifies the `robotId` from the URL or the envelope.
+3.  It finds the corresponding "Session" (Durable Object) and broadcasts the message to the Robot Phone.
 
-### VcuRobotRepository.kt
-- Wraps ConnectionManager in coroutines
-- Fire-and-forget command dispatch
-- Auto-reconnect on failure
-- Mutex-protected connection state
+### Phase 3: Unpacking & Alignment (Robot Phone)
+1.  The `BhoomiBotService` (running in the background on the Robot phone) receives the message.
+2.  **CRITICAL SEQUENCE ALIGNMENT**: The service unpacks the JSON and talks to the VCU via Bluetooth in a specific order:
+    *   **First**: It sends the **Speed** command (`SPD40`).
+    *   **Second**: It sends the **Direction** command (`F`).
+3.  This sequence matches the **Direct VCU Mode** behavior, ensuring the robot starts moving instantly and doesn't "jump" speed levels when straightening up.
 
-## Remote Communication Flow (Live Link)
+---
 
-### Message Types (LiveMessageType.kt)
-| Type | Direction | Purpose |
-|------|-----------|---------|
-| HELLO | Bidirectional | Session handshake |
-| VIDEO_FRAME | Robot→Operator | JPEG camera frame |
-| TELEMETRY | Robot→Operator | Robot status snapshot |
-| COMMAND | Operator→Robot | Drive/aux commands |
-| PEER_STATUS | Bidirectional | Connection health |
-| PING/PONG | Bidirectional | Keepalive |
-| ACK | Bidirectional | Message acknowledgment |
+## ASCII Protocol (VcuProtocol.kt)
+The VCU firmware (ESP32) only understands short ASCII tokens. Every command ends with a newline (`\n`).
 
-### LiveEnvelope Structure
-```json
-{
-  "type": "COMMAND",
-  "robotId": "BhoomiBot-01",
-  "ts": 1719123456789,
-  "payload": "{\"drive\":\"FORWARD\",...}",
-  "ack": false,
-  "code": 0,
-  "retry": 0
-}
-```
+| Intent | ASCII Token | Description |
+| :--- | :--- | :--- |
+| **Forward** | `F` | Set motors to forward polarity |
+| **Reverse** | `B` | Set motors to reverse polarity |
+| **Left** | `L` | Spin motors for left turn |
+| **Right** | `R` | Spin motors for right turn |
+| **Stop** | `S` | Electronic brake (Stop) |
+| **Emergency**| `E` | Immediate power cut |
+| **Speed** | `SPD[0..100]` | PWM duty cycle (magnitude of movement) |
+| **PTO** | `PTO0 / PTO1` | Power Take-Off Toggle |
+| **Lights** | `LGT0 / LGT1` | Work Lights Toggle |
 
-### LiveLinkRepositoryImpl.kt Flow
-1. **Connect**:
-   - Store config (serverUrl, robotId, sessionCode, role)
-   - Launch message collector coroutine
-   - Open WebSocket connection
-
-2. **Message Handling**:
-   - Demultiplex by message type
-   - Decode payload to appropriate model
-   - Emit to typed flows (telemetry, commands, frames)
-
-3. **Publish**:
-   - Telemetry: `LiveEnvelope(type=TELEMETRY, payload=encodeTelemetry())`
-   - Commands: `LiveEnvelope(type=COMMAND, payload=encodeCommand())`
-   - Frames: `sendFrame(jpegBytes)` (binary, no envelope)
-
-## Control Flow Comparison
-
-### Manual Driving (Local)
-```
-UI → ManualViewModel → RobotRepository.sendDriveCommand() 
-→ VcuRobotRepository → ConnectionManager.send() 
-→ ESP32 Serial → Motors
-```
-
-### Remote Driving (Live Link)
-```
-UI → OperatorLiveViewModel → LiveLinkRepository.sendCommand()
-→ LiveEnvelope → WebSocketLiveLinkClient → Relay Server
-→ WebSocket to Robot → LiveLinkRepositoryImpl
-→ Incoming Commands Flow → Robot ViewModel → Local Repository
-→ VcuRobotRepository → ESP32 Serial → Motors
-```
+---
 
 ## Data Models
 
-### RobotCommand.kt (Operator→Robot)
+### RobotCommand.kt (Operator → Robot)
 ```kotlin
 data class RobotCommand(
-    val drive: DriveCommand = STOP,
-    val speedPercent: Int = 0,
+    val drive: DriveCommand = STOP,    // Directional intent (F, B, L, R, S)
+    val speedPercent: Int = 0,         // Motor power (0 to 100)
     val emergencyStop: Boolean = false,
-    val pto: Boolean? = null,
-    val lights: Boolean? = null,
-    val liveCamera: Boolean? = null
+    val pto: Boolean? = null,          // Power Take-Off
+    val lights: Boolean? = null,       // Headlights
+    val liveCamera: Boolean? = null,   // Request broadcast Start/Stop
+    val useRearCamera: Boolean? = null // Flip camera lens
 )
 ```
 
-### TelemetrySnapshot.kt (Robot→Operator)
-Contains battery, GPS, camera, AI status information
+---
 
-### LiveFrame.kt
-Container for JPEG-encoded camera frames
+## Key Design Decisions (Cloudflare Era)
 
-## Error Handling
+### 1. Atomic JSON Transmission
+Instead of sending many small serial-like messages over the internet, we send **one JSON object** per user interaction. This ensures the Robot receives the "Complete Intent" (Speed + Direction) at once, preventing "jittery" movement caused by internet lag.
 
-### Connection States (LiveConnectionState.kt)
-- IDLE - No connection
-- CONNECTING - Establishing link
-- CONNECTED - Active connection
-- RECONNECTING - Link recovery
-- ERROR - Connection failed
+### 2. Sequential Alignment (The VCU Rule)
+The VCU (ESP32) is sensitive to the order of commands. To mimic a physical joystick:
+1.  We set the "throttle" (Speed) first.
+2.  We engage the "gear" (Direction) second.
+This prevents the VCU from receiving a direction command while the speed is still 0, which would cause the robot to stay still.
 
-### Retry Logic
-- Automatic reconnect on disconnect
-- Exponential backoff for failed sends
-- Configurable auto-reconnect in ConnectionConfig
-
-## Configuration Persistence
-
-### ConnectionPreferences.kt
-- Connection type (BT/WiFi/AUTO)
-- Bluetooth MAC address
-- WiFi host/port
-- Auto-reconnect flag
-- Last connected timestamp
-- Connection timeout
-
-### LiveLinkPreferencesStore.kt
-- Server URL
-- Robot ID
-- Session code
-- Video settings
-- Auto-reconnect preference
-
-## Key Design Decisions
-
-### 1. Repository Pattern
-Both local and remote communicate via repository interfaces:
-- `RobotRepository` (local VCU)
-- `LiveLinkRepository` (remote WebSocket)
-
-This allows UI to be transport-agnostic.
-
-### 2. Fire-and-Forget Commands
-Commands from UI are sent asynchronously without blocking:
-- VcuRobotRepository uses `SupervisorJob` + `Dispatchers.IO`
-- Failed sends are swallowed (no UI crashes)
-
-### 3. Message Demultiplexing
-Single inbound stream split by type:
-- Reduces connection overhead
-- Allows parallel processing
-- Type-safe delivery to appropriate flows
-
-### 4. Binary vs JSON Frames
-Video frames transmitted as raw bytes:
-- More efficient than base64 encoding
-- Separate from text message stream
-- Requires binary WebSocket frame support
-
-## Testing Support
-- `FakeLiveLinkClient` for unit tests
-- `MockRobotData` for simulated status
-- `runTest` scope injection for deterministic testing
-- MockWebServer integration for relay testing
+### 3. Base64-JSON Video for Secure Relays
+Because Cloudflare and other secure proxies can be strict about raw binary data, we wrap video frames in **Base64** strings inside the standard JSON envelope when using the internet mode. In local Hotspot mode, we use raw binary for maximum speed.

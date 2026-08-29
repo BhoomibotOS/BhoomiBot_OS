@@ -48,8 +48,8 @@ class OperatorLiveViewModel(application: Application) : AndroidViewModel(applica
     }
 
     init {
-        // Start the Foreground Service to keep the brain alive
-        BhoomiBotService.start(application)
+        // AI-Fix: Background Service is only for the Robot Phone. 
+        // Removing it from Operator to prevent connection flickering.
 
         // Collect AI status from PerceptionEngine
         viewModelScope.launch {

@@ -15,6 +15,7 @@ import com.bhoomibot.os.feature.onboarding.OnboardingScreen
 import com.bhoomibot.os.feature.camera.CameraScreen
 import com.bhoomibot.os.feature.diagnostics.DiagnosticsScreen
 import com.bhoomibot.os.feature.live.OperatorLiveScreen
+import com.bhoomibot.os.feature.live.RobotLiveScreen
 import com.bhoomibot.os.feature.settings.RobotSettingsScreen
 import com.bhoomibot.os.feature.robot.RobotSectionScreen
 import com.bhoomibot.os.feature.operator.OperatorHomeScreen
@@ -24,6 +25,7 @@ import com.bhoomibot.os.feature.connection.ConnectionOptionsScreen
 import com.bhoomibot.os.model.DeviceRole
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
@@ -31,12 +33,18 @@ import java.nio.charset.StandardCharsets
 fun AppNavigation(
     navController: NavHostController = rememberNavController()
 ) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     NavHost(navController = navController, startDestination = AppRoute.Onboarding) {
         composable(AppRoute.Onboarding) {
             OnboardingScreen(onRoleSelected = { role ->
-                when (role) {
-                    DeviceRole.OPERATOR -> navController.navigate(AppRoute.OperatorHome)
-                    DeviceRole.ROBOT -> navController.navigate(AppRoute.RobotHome)
+                scope.launch {
+                    com.bhoomibot.os.data.DevicePreferences.setRole(context, role)
+                    when (role) {
+                        DeviceRole.OPERATOR -> navController.navigate(AppRoute.OperatorHome)
+                        DeviceRole.ROBOT -> navController.navigate(AppRoute.RobotHome)
+                    }
                 }
             })
         }
@@ -81,7 +89,7 @@ fun AppNavigation(
         composable(AppRoute.OperatorLive) {
             OperatorLiveScreen(
                 onBackClick = { navController.popBackStack() },
-                onOpenOptions = { /* Handle options */ }
+                onOpenOptions = { navController.navigate(AppRoute.LiveLinkSettings) }
             )
         }
         composable(AppRoute.Diagnostics) {
@@ -100,6 +108,12 @@ fun AppNavigation(
         composable(AppRoute.Camera) {
             CameraScreen(onBackClick = { navController.popBackStack() })
         }
+        composable(AppRoute.RobotLive) {
+            RobotLiveScreen(
+                onBackClick = { navController.popBackStack() },
+                onOpenOptions = { navController.navigate(AppRoute.LiveLinkSettings) }
+            )
+        }
         composable(AppRoute.ConnectionSettings) {
             ConnectionSettingsScreen(onBackClick = { navController.popBackStack() })
         }
@@ -109,7 +123,7 @@ fun AppNavigation(
                 onStart = { role ->
                     // Actually navigate and start the link based on the chosen role
                     if (role == DeviceRole.ROBOT) {
-                        navController.navigate(AppRoute.RobotHome) {
+                        navController.navigate(AppRoute.RobotLive) {
                             popUpTo(AppRoute.LiveLinkSettings) { inclusive = true }
                         }
                     } else {

@@ -19,6 +19,7 @@ object AppRoute {
     const val Diagnostics = "diagnostics"
     const val Notifications = "notifications"
     const val RobotSettings = "robot_settings"
+    const val RobotLive = "robot_live"
     const val Camera = "camera"
     const val ConnectionSettings = "connection_settings"
     const val LiveLinkSettings = "livelink_settings"

@@ -38,19 +38,22 @@ object RobotCameraManager {
     
     private var targetLongestSide = 1280
     private var targetJpegQuality = 80
+    private var targetFps = 12
 
     fun startCamera(
         context: Context,
         lifecycleOwner: LifecycleOwner,
         quality: VideoQuality = VideoQuality.MEDIUM,
         useRearCamera: Boolean = true,
+        fps: Int = 12,
         onFrame: (ByteArray) -> Unit,
         onBitmap: (Bitmap) -> Unit
     ) {
         this.targetLongestSide = quality.longestSide
         this.targetJpegQuality = quality.jpegQuality
+        this.targetFps = fps
         
-        Log.i("RobotCamera", "Starting camera with target: ${quality.label} (Side: $targetLongestSide, Qual: $targetJpegQuality, Rear: $useRearCamera)")
+        Log.i("RobotCamera", "Starting camera: ${quality.label} @ $fps FPS (Side: $targetLongestSide, Qual: $targetJpegQuality, Rear: $useRearCamera)")
 
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
@@ -112,7 +115,7 @@ object RobotCameraManager {
         onBitmap: (Bitmap) -> Unit
     ) {
         val now = System.currentTimeMillis()
-        val interval = 1000L / 12 
+        val interval = 1000L / targetFps
         if (now - lastAnalyzeTs < interval) {
             proxy.close()
             return

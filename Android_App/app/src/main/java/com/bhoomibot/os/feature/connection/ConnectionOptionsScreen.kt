@@ -89,31 +89,31 @@ fun ConnectionOptionsScreen(
         Spacer(Modifier.height(16.dp))
 
         Column(Modifier.verticalScroll(rememberScrollState())) {
-            // 0. Role Selection (Robot vs Operator)
+            // 1. Network Selection (Same Network vs Different Network)
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("DEVICE ROLE", fontWeight = FontWeight.ExtraBold)
-                    Text("Is this phone on the Robot or in your hand?", color = MutedText, style = MaterialTheme.typography.bodySmall)
+                    Text("CONNECTION TYPE", fontWeight = FontWeight.ExtraBold)
+                    Text("How will the phones connect?", color = MutedText, style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(12.dp))
-                    
+
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DeviceRole.values().forEach { role ->
+                        PhoneNetworkMode.values().forEach { mode ->
                             Button(
-                                onClick = { viewModel.setRole(role) },
+                                onClick = { viewModel.setNetworkMode(mode) },
                                 modifier = Modifier.weight(1f),
                                 shape = MaterialTheme.shapes.medium,
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (role == state.role) SignalGreen else MaterialTheme.colorScheme.surface,
-                                    contentColor = if (role == state.role) Color.Black else MutedText
+                                    containerColor = if (mode == state.networkMode) SignalGreen else MaterialTheme.colorScheme.surface,
+                                    contentColor = if (mode == state.networkMode) Color.White else MutedText
                                 )
-                            ) { Text(role.name, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                            ) { Text(mode.title, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
                         }
                     }
+                    Spacer(Modifier.height(8.dp))
+                    Text(state.networkMode.description, color = MutedText, style = MaterialTheme.typography.bodySmall)
                 }
             }
             Spacer(Modifier.height(12.dp))
-
-            // 1. Network Selection (Same Network vs Different Network)
 
             // 2. Local Hub (Only for Robot + Hotspot Mode)
             if (state.networkMode == PhoneNetworkMode.HOTSPOT && state.role == DeviceRole.ROBOT) {
@@ -194,7 +194,7 @@ fun ConnectionOptionsScreen(
                             value = state.serverUrl,
                             onValueChange = viewModel::setServerUrl,
                             label = { Text("Server URL (ws://...)") },
-                            placeholder = { Text(if (state.networkMode == PhoneNetworkMode.INTERNET) "wss://bhoomibot-os.onrender.com" else "ws://192.168.1.X:8080") },
+                            placeholder = { Text(if (state.networkMode == PhoneNetworkMode.INTERNET) "wss://bhoomibot-os.madhumohan-contact.workers.dev/api/relay" else "ws://192.168.1.X:8080") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )

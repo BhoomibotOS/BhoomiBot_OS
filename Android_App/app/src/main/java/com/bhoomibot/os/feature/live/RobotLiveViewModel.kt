@@ -88,11 +88,13 @@ class RobotLiveViewModel(application: Application) : AndroidViewModel(applicatio
 
         viewModelScope.launch(exceptionHandler) {
             val prefs = LiveLinkPreferencesStore.preferences(application).first()
+            val role = com.bhoomibot.os.data.DevicePreferences.role(application).first() ?: DeviceRole.ROBOT
+            
             config = ConnectionConfig(
                 serverUrl = prefs.serverUrl,
                 robotId = prefs.robotId,
                 sessionCode = prefs.sessionCode,
-                role = DeviceRole.ROBOT,
+                role = role,
                 autoReconnect = prefs.autoReconnect,
                 videoFps = prefs.videoFps,
                 videoQuality = runCatching { VideoQuality.valueOf(prefs.videoQuality) }.getOrDefault(VideoQuality.MEDIUM)
@@ -103,7 +105,7 @@ class RobotLiveViewModel(application: Application) : AndroidViewModel(applicatio
             updateNetworkProfile()
             _uiState.update {
                 it.copy(
-                    activeRole = DeviceRole.ROBOT,
+                    activeRole = role,
                     activeRobotId = config!!.robotId,
                     activeSession = config!!.sessionCode,
                     networkMode = mode
@@ -207,13 +209,10 @@ class RobotLiveViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.update {
             it.copy(
                 isConfigurationReady = config != null,
-                // LOGIC: 1080p for Hotspot, Capped for Internet
-                videoFps = if (isHotspotMode) 15 else (if (caps == null) 8 else 12),
-                videoQuality = when {
-                    isHotspotMode -> VideoQuality.ULTRA // Force 1080p on Hotspot
-                    savedVideoQuality == VideoQuality.ULTRA -> VideoQuality.HIGH // Cap Render at 720p
-                    else -> savedVideoQuality
-                },
+                // CLOUDFLARE OPTIMIZATION: Use the saved FPS and Quality without caps.
+                // We no longer downgrade to 720p/12fps on internet because binary relay handles it.
+                videoFps = savedVideoFps,
+                videoQuality = savedVideoQuality,
                 isConstrainedNetwork = !isHotspotMode && (caps == null || !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED))
             )
         }

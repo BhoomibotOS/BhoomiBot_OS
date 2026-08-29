@@ -34,7 +34,8 @@ class ManualViewModel(application: Application) : AndroidViewModel(application) 
     val uiState: StateFlow<ManualUiState> = _uiState.asStateFlow()
 
     init {
-        BhoomiBotService.start(application)
+        // AI-Fix: Background Service is only for the Robot Phone.
+        // Removing it from Operator to prevent connection flickering.
 
         viewModelScope.launch {
             repository.isConnected.collectLatest { connected ->
