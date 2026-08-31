@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -99,7 +100,7 @@ class OperatorLiveViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch(exceptionHandler) { repository.telemetry.collect { _uiState.update { s -> s.copy(telemetry = it) } } }
 
         viewModelScope.launch(Dispatchers.Default + exceptionHandler) {
-            repository.frames.collect { frame ->
+            repository.frames.collectLatest { frame: com.bhoomibot.os.connection.model.LiveFrame ->
                 val bmp = runCatching { decoder.decode(frame.jpeg) }.getOrNull()
                 _uiState.update { s -> s.copy(frame = bmp) }
             }

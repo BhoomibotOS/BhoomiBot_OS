@@ -28,6 +28,9 @@ class MockRobotRepository(private val mockVcu: MockVcu = MockVcu()) : RobotRepos
     private val _rpmData = MutableStateFlow(Pair(0, 0))
     override val rpmData: StateFlow<Pair<Int, Int>> = _rpmData.asStateFlow()
 
+    private val _vcuBattery = MutableStateFlow(95) // Mock hardware battery at 95%
+    override val vcuBattery: StateFlow<Int> = _vcuBattery.asStateFlow()
+
     override fun status(): RobotStatus = RobotStatus(isOnline = true)
 
     override fun sendDriveCommand(command: DriveCommand) {

@@ -9,6 +9,7 @@ package com.bhoomibot.os.connection.model
 data class TelemetrySnapshot(
     val isOnline: Boolean = false,
     val batteryPercent: Int = 0,
+    val vcuBattery: Int = 0,
     val mode: String = "",
     val mission: String = "",
     val gpsStatus: String = "",

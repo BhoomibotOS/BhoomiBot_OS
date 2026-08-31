@@ -24,7 +24,8 @@ enum class DriveCommand {
 // All fields have safe default values so the UI can render before real data arrives.
 data class RobotStatus(
     val isOnline: Boolean = true,        // true = robot is connected/reachable, false = OFFLINE
-    val batteryPercent: Int = 85,        // Remaining battery level, 0–100%
+    val batteryPercent: Int = 0,         // Robot Phone battery level, 0–100%
+    val vcuBattery: Int = 0,             // Actual Robot Hardware battery level from VCU, 0-100%
     val mode: String = "Manual",         // Current control mode (e.g. "Manual", future "Autonomous")
     val mission: String = "Idle",        // What the robot is currently doing (e.g. "Idle", a task name)
     val gpsStatus: String = "Connected", // GPS receiver state (e.g. "Connected", "No Signal")

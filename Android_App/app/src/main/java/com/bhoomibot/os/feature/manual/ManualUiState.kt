@@ -37,6 +37,7 @@ data class ManualUiState(
     val useRearCamera: Boolean = true,                 // Front vs Rear camera
     val lastCommand: DriveCommand = DriveCommand.STOP, // Most recent drive command sent
     val bluetoothConnected: Boolean = false,           // ESP32/Bluetooth link status
+    val localPhoneBattery: Int = 0,                    // Local phone battery percentage
     val isRecording: Boolean = false,                  // Whether a mission recording session is active
     val controlPath: ControlPath = ControlPath.DIRECT_VCU, // Default to direct control
     val leftRpm: Int = 0,                             // Real-time RPM from Left Motor

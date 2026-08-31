@@ -18,6 +18,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,7 +52,11 @@ class WebSocketLiveLinkClient(
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val _state = MutableStateFlow(LiveConnectionState.IDLE)
     private val _messages = MutableSharedFlow<LiveEnvelope>(extraBufferCapacity = 128)
-    private val _frames = MutableSharedFlow<LiveFrame>(extraBufferCapacity = 64)
+    private val _frames = MutableSharedFlow<LiveFrame>(
+        replay = 0, 
+        extraBufferCapacity = 1, 
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     private val _lastError = MutableStateFlow<String?>(null)
 
     private val client = OkHttpClient.Builder()

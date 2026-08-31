@@ -11,6 +11,7 @@ import com.bhoomibot.os.model.RobotStatus
 fun RobotStatus.toTelemetry(): TelemetrySnapshot = TelemetrySnapshot(
     isOnline = isOnline,
     batteryPercent = batteryPercent,
+    vcuBattery = vcuBattery,
     mode = mode,
     mission = mission,
     gpsStatus = gpsStatus,

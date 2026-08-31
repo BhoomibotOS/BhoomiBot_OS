@@ -16,6 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,7 +40,11 @@ class LiveLinkRepositoryImpl(
     private val _peerStatus = MutableStateFlow(PeerStatus())
     private val _telemetry = MutableStateFlow(TelemetrySnapshot())
     private val _incomingCommands = MutableSharedFlow<RobotCommand>(extraBufferCapacity = 64)
-    private val _frames = MutableSharedFlow<LiveFrame>(extraBufferCapacity = 64)
+    private val _frames = MutableSharedFlow<LiveFrame>(
+        replay = 0, 
+        extraBufferCapacity = 1, 
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     private val _alerts = MutableSharedFlow<Pair<String, String>>(extraBufferCapacity = 8)
     private var currentRobotId: String = ""
     private var currentServerUrl: String? = null

@@ -3,16 +3,21 @@ package com.bhoomibot.os.service
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import com.bhoomibot.os.connection.model.VideoQuality
+import com.bhoomibot.os.connection.model.toTelemetry
 import com.bhoomibot.os.connection.provideLiveLinkRepository
 import com.bhoomibot.os.data.DevicePreferences
 import com.bhoomibot.os.data.LiveLinkPreferencesStore
+import com.bhoomibot.os.data.LocationTracker
 import com.bhoomibot.os.feature.autonomous.AutonomyManager
 import com.bhoomibot.os.model.DeviceRole
+import com.bhoomibot.os.model.MockRobotData
 import com.bhoomibot.os.repository.provideRobotRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
@@ -30,6 +35,8 @@ class BhoomiBotService : LifecycleService() {
     private var isHardwareLinkActive = false
     private var isBroadcastActive = false
     private var bridgeJob: Job? = null
+    private var telemetryJob: Job? = null
+    private var locationTracker: LocationTracker? = null
 
     private var currentQuality: VideoQuality? = null
     private var currentUseRear: Boolean? = null
@@ -69,6 +76,9 @@ class BhoomiBotService : LifecycleService() {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "BhoomiBot::RobotBrainLock")
         wakeLock?.acquire()
+
+        locationTracker = LocationTracker(applicationContext)
+        locationTracker?.startTracking()
 
         startCommandBridge()
     }
@@ -135,6 +145,9 @@ class BhoomiBotService : LifecycleService() {
                 role = role
             ))
 
+            // Start background telemetry loop (500ms heartbeat)
+            startTelemetryLoop(liveRepo, robotRepo)
+
             liveRepo.incomingCommands.collect { cmd ->
                 android.util.Log.d("BhoomiBotRelay", "[SERVICE] Forwarding CMD: ${cmd.drive} @ ${cmd.speedPercent}%")
 
@@ -145,13 +158,6 @@ class BhoomiBotService : LifecycleService() {
                     /**
                      * CRITICAL SEQUENCE ALIGNMENT (VCU SYNC):
                      * We must send the Speed command BEFORE the Direction command.
-                     *
-                     * Why?
-                     * 1. On first press: VCU needs the Speed (e.g. SPD2) before it gets 
-                     *    the 'F' command, otherwise it sees "Forward at 0 speed" and ignores it.
-                     * 2. On straightening up: Sending Speed then Direction allows the VCU 
-                     *    to transition state smoothly without jumping speed levels, 
-                     *    matching the timing of a physical Bluetooth connection.
                      */
                     robotRepo.updateSpeed(cmd.speedPercent)
                     robotRepo.sendDriveCommand(cmd.drive)
@@ -195,6 +201,45 @@ class BhoomiBotService : LifecycleService() {
         }
     }
 
+    /**
+     * Permanent 500ms telemetry heartbeat.
+     * Ensures the Operator sees real-time VCU status even if the Robot screen is locked.
+     */
+    private fun startTelemetryLoop(liveRepo: com.bhoomibot.os.connection.repository.LiveLinkRepository, robotRepo: com.bhoomibot.os.repository.RobotRepository) {
+        telemetryJob?.cancel()
+        telemetryJob = serviceScope.launch(Dispatchers.Default) {
+            while (isActive) {
+                val hardwareOnline = robotRepo.isConnected.value
+                val vcuBatteryLevel = robotRepo.vcuBattery.value
+                val location = locationTracker?.currentLocation?.value
+
+                // 1. Read Local Phone Battery
+                val batteryStatus: Intent? = IntentFilter(Intent.ACTION_BATTERY_CHANGED).let { filter ->
+                    applicationContext.registerReceiver(null, filter)
+                }
+                val level: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+                val scale: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+                val phoneBatteryPercent = if (level != -1 && scale != -1) (level * 100 / scale.toFloat()).toInt() else 0
+                
+                // 2. FORMAT GPS STATUS: "Lat, Long" or "Searching..."
+                val gpsStatusLabel = if (location != null) {
+                    "${String.format("%.4f", location.latitude)}, ${String.format("%.4f", location.longitude)}"
+                } else {
+                    "Searching..."
+                }
+
+                val realStatus = MockRobotData.robotStatus.copy(
+                    isOnline = hardwareOnline,
+                    batteryPercent = phoneBatteryPercent,
+                    vcuBattery = vcuBatteryLevel,
+                    gpsStatus = gpsStatusLabel
+                )
+                liveRepo.publishTelemetry(realStatus.toTelemetry())
+                delay(500)
+            }
+        }
+    }
+
     private fun startVision(quality: VideoQuality, useRearCamera: Boolean, fps: Int) {
         val perception = AutonomyManager.getPerceptionEngine(applicationContext)
         val liveRepo = provideLiveLinkRepository(application)
@@ -228,6 +273,7 @@ class BhoomiBotService : LifecycleService() {
         RobotCameraManager.stopCamera()
         wakeLock?.release()
         bridgeJob?.cancel()
+        telemetryJob?.cancel()
         serviceScope.cancel()
         super.onDestroy()
     }

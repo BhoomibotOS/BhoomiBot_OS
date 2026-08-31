@@ -19,14 +19,21 @@ import kotlinx.coroutines.flow.asStateFlow
  *  Right now every command is a no-op (does nothing) and status always returns default values.
  *  Replace these bodies with real ESP32 / Bluetooth communication when that hardware is ready. */
 class LocalRobotRepository : RobotRepository {
-    // Returns the default status object (robot appears online at 85% battery, Manual mode, etc.).
-    override fun status() = RobotStatus()
+    // Returns the default status object (robot appears online at 0% battery, Manual mode, etc.).
+    override fun status() = RobotStatus(
+        isOnline = true,
+        batteryPercent = 0,
+        vcuBattery = 0
+    )
 
     private val _isConnected = MutableStateFlow(true) // Local/fake is always "connected"
     override val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
     private val _rpmData = MutableStateFlow(Pair(0, 0))
     override val rpmData: StateFlow<Pair<Int, Int>> = _rpmData.asStateFlow()
+
+    private val _vcuBattery = MutableStateFlow(85)
+    override val vcuBattery: StateFlow<Int> = _vcuBattery.asStateFlow()
 
     // No-op: would send a drive command to the robot over the real transport.
     override fun sendDriveCommand(command: DriveCommand) = Unit

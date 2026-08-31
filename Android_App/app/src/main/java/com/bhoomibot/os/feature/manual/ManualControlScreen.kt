@@ -181,7 +181,13 @@ private fun MarkerButton(label: String, icon: androidx.compose.ui.graphics.vecto
 }
 
 @Composable private fun TopStatusBar(state: ManualUiState, onEmergencyStop: () -> Unit) = Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-    TopStatus("BAT", "${state.robotStatus.batteryPercent}%", SignalGreen, Modifier.weight(1f))
+    // 1. Phone Battery (Local Handheld if Direct, Remote Robot Phone if Via Robot)
+    val phoneBattery = if (state.controlPath == ControlPath.DIRECT_VCU) state.localPhoneBattery else state.robotStatus.batteryPercent
+    TopStatus("PH", "$phoneBattery%", SignalGreen, Modifier.weight(1f))
+    
+    // 2. Robot Battery (Actual Hardware/Chassis Battery via VCU ADC)
+    TopStatus("RB", "${state.robotStatus.vcuBattery}%", SignalGreen, Modifier.weight(1f))
+
     TopStatus("GPS", state.robotStatus.gpsStatus, if (state.robotStatus.gpsStatus == "No Signal") SafetyRed else SignalGreen, Modifier.weight(1f))
     TopStatus("VCU", if (state.bluetoothConnected) "Connected" else "Offline", if (state.bluetoothConnected) SignalGreen else SafetyRed, Modifier.weight(1f))
     TopStatus("MODE", if (state.isRecording) "TEACHING" else "Manual", if (state.isRecording) SafetyRed else MaterialTheme.colorScheme.secondary, Modifier.weight(1f))

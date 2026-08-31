@@ -3,6 +3,9 @@ package com.bhoomibot.os.feature.manual
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import android.app.Application
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.widget.Toast
 import com.bhoomibot.os.connection.model.RobotCommand
 import com.bhoomibot.os.connection.repository.LiveLinkRepositoryProvider
@@ -16,10 +19,13 @@ import com.bhoomibot.os.repository.provideRobotRepository
 import com.bhoomibot.os.model.DriveCommand
 import com.bhoomibot.os.repository.RobotRepository
 import com.bhoomibot.os.service.BhoomiBotService
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class ManualViewModel(application: Application) : AndroidViewModel(application) {
@@ -37,6 +43,31 @@ class ManualViewModel(application: Application) : AndroidViewModel(application) 
         // AI-Fix: Background Service is only for the Robot Phone.
         // Removing it from Operator to prevent connection flickering.
 
+        // 1. Initial Local Phone Battery Read (Operator side)
+        val initialStatus: Intent? = IntentFilter(Intent.ACTION_BATTERY_CHANGED).let { filter ->
+            application.registerReceiver(null, filter)
+        }
+        val initLevel: Int = initialStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val initScale: Int = initialStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        val initPercent = if (initLevel != -1 && initScale != -1) (initLevel * 100 / initScale.toFloat()).toInt() else 0
+        
+        // Update state flow with real phone battery before any collectors start
+        _uiState.update { it.copy(localPhoneBattery = initPercent) }
+
+        // 2. Periodic Local Phone Battery Update (Operator side)
+        viewModelScope.launch {
+            while (isActive) {
+                val batteryStatus: Intent? = IntentFilter(Intent.ACTION_BATTERY_CHANGED).let { filter ->
+                    application.registerReceiver(null, filter)
+                }
+                val level: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+                val scale: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+                val phoneBatteryPercent = if (level != -1 && scale != -1) (level * 100 / scale.toFloat()).toInt() else 0
+                _uiState.update { it.copy(localPhoneBattery = phoneBatteryPercent) }
+                delay(10000) // Update every 10 seconds
+            }
+        }
+
         viewModelScope.launch {
             repository.isConnected.collectLatest { connected ->
                 if (_uiState.value.controlPath == ControlPath.DIRECT_VCU) {
@@ -50,7 +81,11 @@ class ManualViewModel(application: Application) : AndroidViewModel(application) 
                 if (_uiState.value.controlPath == ControlPath.VIA_ROBOT) {
                     _uiState.value = _uiState.value.copy(
                         bluetoothConnected = tel.isOnline,
-                        robotStatus = _uiState.value.robotStatus.copy(batteryPercent = tel.batteryPercent)
+                        robotStatus = _uiState.value.robotStatus.copy(
+                            batteryPercent = tel.batteryPercent,
+                            vcuBattery = tel.vcuBattery,
+                            gpsStatus = tel.gpsStatus
+                        )
                     )
                 }
             }
@@ -78,6 +113,16 @@ class ManualViewModel(application: Application) : AndroidViewModel(application) 
                 )
             }
         }
+
+        viewModelScope.launch {
+            repository.vcuBattery.collectLatest { battery ->
+                if (_uiState.value.controlPath == ControlPath.DIRECT_VCU) {
+                    _uiState.value = _uiState.value.copy(
+                        robotStatus = _uiState.value.robotStatus.copy(vcuBattery = battery)
+                    )
+                }
+            }
+        }
         
         viewModelScope.launch {
             repository.sendDriveCommand(DriveCommand.STOP)
@@ -90,7 +135,14 @@ class ManualViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun setControlPath(path: ControlPath) {
-        _uiState.value = _uiState.value.copy(controlPath = path, bluetoothConnected = false)
+        val currentLocalStatus = repository.isConnected.value
+        val currentRemoteStatus = liveLinkRepository.telemetry.value.isOnline
+        
+        _uiState.value = _uiState.value.copy(
+            controlPath = path, 
+            bluetoothConnected = if (path == ControlPath.DIRECT_VCU) currentLocalStatus else currentRemoteStatus
+        )
+
         if (path == ControlPath.DIRECT_VCU) {
             viewModelScope.launch { repository.sendDriveCommand(DriveCommand.STOP) }
         }

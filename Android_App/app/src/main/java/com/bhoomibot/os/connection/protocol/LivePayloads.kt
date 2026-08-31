@@ -15,6 +15,7 @@ object LivePayloads {
     fun encodeTelemetry(t: TelemetrySnapshot): String = JSONObject().apply {
         put("isOnline", t.isOnline)
         put("batteryPercent", t.batteryPercent)
+        put("vcuBattery", t.vcuBattery)
         put("mode", t.mode)
         put("mission", t.mission)
         put("gpsStatus", t.gpsStatus)
@@ -27,6 +28,7 @@ object LivePayloads {
         TelemetrySnapshot(
             isOnline = o.optBoolean("isOnline", false),
             batteryPercent = o.optInt("batteryPercent", 0),
+            vcuBattery = o.optInt("vcuBattery", 0),
             mode = o.optString("mode", ""),
             mission = o.optString("mission", ""),
             gpsStatus = o.optString("gpsStatus", ""),

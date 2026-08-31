@@ -26,6 +26,9 @@ interface RobotRepository {
     // Real-time RPM feedback from the motors (Left, Right)
     val rpmData: StateFlow<Pair<Int, Int>>
 
+    // Real-time battery feedback from the VCU hardware (percentage 0-100)
+    val vcuBattery: StateFlow<Int>
+
     // Sends a movement/stop command to the robot (FORWARD, STOP, EMERGENCY_STOP, ...).
     fun sendDriveCommand(command: DriveCommand)
 

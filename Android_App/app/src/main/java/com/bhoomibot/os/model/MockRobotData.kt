@@ -29,9 +29,10 @@ data class RobotSystemStatus(
 
 // Centralized mock source. Replace with a repository implementation in a future phase.
 object MockRobotData {
-    val robotStatus: RobotStatus = RobotStatus(
-        isOnline = true,
-        batteryPercent = 82,
+    var robotStatus: RobotStatus = RobotStatus(
+        isOnline = false, // Default to false
+        batteryPercent = 0,
+        vcuBattery = 0,
         mode = "Manual",
         mission = "Field A — Pass 2",
         gpsStatus = "Connected",

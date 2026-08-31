@@ -38,16 +38,25 @@ class VcuRobotRepository(private val context: Context) : RobotRepository {
     private val _rpmData = MutableStateFlow(Pair(0, 0))
     override val rpmData: StateFlow<Pair<Int, Int>> = _rpmData.asStateFlow()
 
+    private val _vcuBattery = MutableStateFlow(0)
+    override val vcuBattery: StateFlow<Int> = _vcuBattery.asStateFlow()
+
     private val commandChannel = Channel<String>(Channel.BUFFERED)
     private var telemetryJob: Job? = null
 
     init {
-        // AI-Fix: Initial connection attempt to start telemetry
+        // PROACTIVE CONNECTION MAINTAINER
+        // Keeps the VCU link alive and updates status in real-time, even when idle.
         repositoryScope.launch {
-            try {
-                ensureConnected()
-            } catch (e: Exception) {
-                android.util.Log.e("VCU", "Initial connection failed: ${e.message}")
+            while (isActive) {
+                if (!_isConnected.value) {
+                    try {
+                        ensureConnected()
+                    } catch (e: Exception) {
+                        // Silent retry every 5s
+                    }
+                }
+                delay(5000)
             }
         }
 
@@ -83,29 +92,27 @@ class VcuRobotRepository(private val context: Context) : RobotRepository {
     private var _currentPrefs: ConnectionPreferences? = null
 
     private suspend fun ensureConnected(): ConnectionManager? {
-        if (_isConnected.value && manager != null) return manager
-        
+        // SMART CHECK: If we are already connected and healthy, just return.
+        // This prevents the "Flicker" caused by reconnecting on every command.
+        if (_isConnected.value && manager != null) {
+            return manager
+        }
+
         return connectMutex.withLock {
-            if (!_isConnected.value || manager == null) {
-                try {
-                    val m = getManager()
-                    m.connect()
-                    
-                    // We must call receive() to actually trigger the blocking connect() in ConnectionManager
-                    // Start telemetry before marking as connected
+            // Double-check inside the lock to prevent race conditions
+            if (_isConnected.value && manager != null) return@withLock manager
+            
+            val m = getManager()
+            try {
+                m.connect()
+                if (telemetryJob?.isActive != true) {
                     startTelemetryListener(m)
-                    
-                    // Small delay to allow the first receive attempt to succeed or fail
-                    delay(500)
-                    
-                    _isConnected.value = true
-                    m
-                } catch (e: Exception) {
-                    android.util.Log.e("VCU", "Connection error: ${e.message}")
-                    _isConnected.value = false
-                    null
                 }
-            } else manager
+                m
+            } catch (e: Exception) {
+                android.util.Log.e("VCU", "Hardware initialization failed: ${e.message}")
+                null
+            }
         }
     }
 
@@ -113,7 +120,15 @@ class VcuRobotRepository(private val context: Context) : RobotRepository {
         telemetryJob?.cancel()
         telemetryJob = repositoryScope.launch {
             try {
+                // receive() blocks until the Bluetooth/WiFi socket is physically open.
                 m.receive().collect { line ->
+                    // TRUTHFUL STATUS: Only set Connected to true when we actually see 
+                    // a valid line of data arriving from the VCU hardware.
+                    if (!_isConnected.value) {
+                        _isConnected.value = true
+                        android.util.Log.i("VCU", "Hardware Link Verified: Data arriving.")
+                    }
+
                     if (line.startsWith("RPM ")) {
                         runCatching {
                             val data = line.substring(4).split(",")
@@ -123,15 +138,26 @@ class VcuRobotRepository(private val context: Context) : RobotRepository {
                                 _rpmData.value = Pair(left, right)
                             }
                         }
+                    } else if (line.startsWith("VBAT ")) {
+                        runCatching {
+                            val battery = line.substring(5).trim().toIntOrNull() ?: 0
+                            _vcuBattery.value = battery.coerceIn(0, 100)
+                        }
                     }
                 }
             } catch (e: Exception) {
+                android.util.Log.e("VCU", "Telemetry link failed: ${e.message}")
+            } finally {
                 _isConnected.value = false
+                android.util.Log.w("VCU", "Hardware Link Offline.")
             }
         }
     }
 
-    override fun status(): RobotStatus = RobotStatus(isOnline = _isConnected.value)
+    override fun status(): RobotStatus = RobotStatus(
+        isOnline = _isConnected.value,
+        vcuBattery = _vcuBattery.value
+    )
 
     override fun sendDriveCommand(command: DriveCommand) {
         commandChannel.trySend(command.toProtocol())

@@ -51,7 +51,6 @@ class RobotLiveViewModel(application: Application) : AndroidViewModel(applicatio
     val uiState: StateFlow<RobotLiveUiState> = _uiState.asStateFlow()
 
     private var config: ConnectionConfig? = null
-    private var telemetryJob: Job? = null
     private val connectivityManager = application.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     
     private var savedVideoFps = 12
@@ -115,17 +114,11 @@ class RobotLiveViewModel(application: Application) : AndroidViewModel(applicatio
             
             // AI-Fix: Auto-start broadcast as soon as config is ready
             startBroadcast()
-            
-            // Sync status to operator immediately
-            startTelemetry()
         }
 
         viewModelScope.launch(exceptionHandler) { repository.connectionState.collect { _uiState.update { s -> s.copy(connectionState = it) } } }
         viewModelScope.launch(exceptionHandler) { repository.connectionError.collect { _uiState.update { s -> s.copy(error = it) } } }
         viewModelScope.launch(exceptionHandler) { repository.peerStatus.collect { _uiState.update { s -> s.copy(peerStatus = it) } } }
-
-        // AI-Fix: We no longer listen for commands here. 
-        // BhoomiBotService is now the permanent listener for commands.
 
         connectivityManager.registerDefaultNetworkCallback(networkCallback)
     }
@@ -138,11 +131,11 @@ class RobotLiveViewModel(application: Application) : AndroidViewModel(applicatio
         
         repository.connect(cfg)
         _uiState.update { it.copy(isBroadcasting = true) }
-        startTelemetry()
         
         val intent = Intent(getApplication(), BhoomiBotService::class.java).apply {
             action = BhoomiBotService.ACTION_START_BROADCAST
             putExtra("EXTRA_QUALITY", _uiState.value.videoQuality.name)
+            putExtra("EXTRA_FPS", _uiState.value.videoFps)
             putExtra("EXTRA_USE_REAR", isRearCamera)
         }
         getApplication<Application>().startService(intent)
@@ -186,21 +179,6 @@ class RobotLiveViewModel(application: Application) : AndroidViewModel(applicatio
     fun processVisionFrame(bitmap: Bitmap) {
     }
 
-    private fun startTelemetry() {
-        if (telemetryJob?.isActive == true) return
-        
-        telemetryJob = viewModelScope.launch {
-            while (isActive) {
-                val hardwareOnline = robotRepository.isConnected.value
-                val realStatus = MockRobotData.robotStatus.copy(
-                    isOnline = hardwareOnline
-                )
-                repository.publishTelemetry(realStatus.toTelemetry())
-                delay(500)
-            }
-        }
-    }
-
     private fun updateNetworkProfile() {
         val network = connectivityManager.activeNetwork
         val caps = network?.let { connectivityManager.getNetworkCapabilities(it) }
@@ -220,7 +198,6 @@ class RobotLiveViewModel(application: Application) : AndroidViewModel(applicatio
 
     override fun onCleared() {
         super.onCleared()
-        telemetryJob?.cancel()
         connectivityManager.unregisterNetworkCallback(networkCallback)
     }
 }
