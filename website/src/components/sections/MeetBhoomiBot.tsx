@@ -7,12 +7,12 @@ import Image from "next/image"
 
 export function MeetBhoomiBot() {
   const specs = [
-    { icon: Settings2, title: "Modular Platform", desc: "Designed for versatility with interchangeable attachments." },
-    { icon: Battery, title: "Electric Drive", desc: "Clean, efficient power for long-duration operations." },
-    { icon: Radio, title: "Remote Operation", desc: "Real-time control via the mobile application." },
-    { icon: Cpu, title: "Sensor Integration", desc: "Rich sensor suite for environment awareness." },
-    { icon: Eye, title: "Vision Capability", desc: "Integrated cameras for monitoring and navigation." },
-    { icon: Shield, title: "Expandable Core", desc: "Open software architecture for future growth." },
+    { icon: Settings2, title: "Modular Platform", desc: "Heavy-duty steel chassis designed for versatility with interchangeable attachments." },
+    { icon: Battery, title: "48V 50Ah LiFePO4", desc: "Industrial-grade energy storage for high-torque and long-duration tasks." },
+    { icon: Radio, title: "Edge Tele-Op", desc: "Real-time, ultra-low latency control via CloudBridge relay." },
+    { icon: Cpu, title: "Dual Motor Drive", desc: "Independent high-torque motors for precise differential steering." },
+    { icon: Eye, title: "Vision-First", desc: "Integrated high-speed video pipeline for remote situational awareness." },
+    { icon: Shield, title: "Industrial Safety", desc: "Built-in electronic braking and hardware-level emergency stop." },
   ]
 
   return (
@@ -30,15 +30,18 @@ export function MeetBhoomiBot() {
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            className="rounded-3xl overflow-hidden bg-white dark:bg-zinc-900 border border-slate-200 dark:border-slate-800 p-4 shadow-2xl"
+            className="rounded-3xl overflow-hidden bg-white dark:bg-zinc-900 border border-slate-200 dark:border-slate-800 p-2 shadow-2xl relative group"
           >
             <Image
-              src="/robots/bhoomibot-platform.jpg"
-              alt="BhoomiBot Platform"
+              src="/robots/proto_type.jpeg"
+              alt="BhoomiBot Prototype Chassis"
               width={1000}
-              height={600}
-              className="w-full h-[400px] object-cover rounded-2xl"
+              height={800}
+              className="w-full h-auto object-cover rounded-2xl grayscale-[0.2] group-hover:grayscale-0 transition-all duration-700"
             />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-8">
+                <p className="text-white text-xs font-mono uppercase tracking-[0.3em]">Engineering Prototype: v2.4 Chassis</p>
+            </div>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

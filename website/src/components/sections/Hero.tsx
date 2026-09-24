@@ -10,7 +10,7 @@ import 'react-loading-skeleton/dist/skeleton.css'
 
 const RobotCanvas = dynamic(() => import("@/components/RobotCanvas"), {
   ssr: false,
-  loading: () => <Skeleton height="100%" borderRadius="1.5rem" baseColor="#222" highlightColor="#444" />
+  loading: () => <div className="w-full h-full bg-slate-900 animate-pulse rounded-[2.5rem]" />
 })
 
 export function Hero() {
@@ -68,18 +68,18 @@ export function Hero() {
             <Button
               size="lg"
               className="px-8 py-6 text-base font-bold rounded-xl shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all duration-300 hover:scale-105"
-              onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={() => window.location.href = '/live'}
             >
               <Play size={20} className="mr-2" />
-              Watch Demo
+              Open Live Console
             </Button>
             <Button
               size="lg"
               variant="outline"
               className="px-8 py-6 text-base font-bold rounded-xl border-2 hover:bg-primary/5 hover:border-primary/50 transition-all duration-300 hover:scale-105"
-              onClick={() => document.getElementById('applications-grid')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={() => document.getElementById('robot')?.scrollIntoView({ behavior: 'smooth' })}
             >
-              Explore Applications
+              View Specifications
             </Button>
           </motion.div>
 
@@ -116,21 +116,20 @@ export function Hero() {
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1, delay: 0.2 }}
-          className="relative h-[400px] md:h-[600px]"
+          className="relative h-[400px] lg:h-[600px]"
         >
           <RobotCanvas />
-          <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-white dark:from-black via-transparent to-transparent opacity-20" />
 
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1.5, duration: 0.5 }}
-            className="absolute bottom-8 right-8 hidden md:block"
+            className="absolute -bottom-6 right-8 hidden md:block"
           >
             <motion.div
               animate={{ y: [0, -8, 0] }}
               transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              className="flex items-center gap-2 text-sm font-medium text-slate-500 dark:text-slate-400 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg"
+              className="flex items-center gap-2 text-sm font-medium text-slate-500 dark:text-slate-400 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border border-slate-200 dark:border-slate-800"
             >
               <span>Scroll to explore</span>
               <ChevronDown size={16} />

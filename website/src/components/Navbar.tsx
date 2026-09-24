@@ -7,13 +7,12 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 const navLinks = [
-  { name: "Home", href: "#home" },
-  { name: "Robot", href: "#robot" },
-  { name: "Agriculture", href: "#agriculture" },
-  { name: "Applications", href: "#applications" },
-  { name: "Technology", href: "#technology" },
-  { name: "About", href: "#about" },
-  { name: "Contact", href: "#contact" },
+  { name: "Home", href: "/" },
+  { name: "Live Console", href: "/live" },
+  { name: "Platform", href: "/#specs" },
+  { name: "Solutions", href: "/#agriculture" },
+  { name: "Technology", href: "/#technology" },
+  { name: "About", href: "/#about" },
 ]
 
 export function Navbar() {

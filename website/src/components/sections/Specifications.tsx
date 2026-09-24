@@ -3,18 +3,18 @@
 import { motion } from "framer-motion"
 
 const specifications = [
-  { category: "Drive System", value: "4WD Differential Drive" },
-  { category: "Motor", value: "High-torque Electric Brushless" },
-  { category: "Battery", value: "LiFePO4 Support" },
-  { category: "Payload", value: "To be finalized" },
-  { category: "Dimensions", value: "To be finalized" },
-  { category: "Ground Clearance", value: "To be finalized" },
-  { category: "Operating Speed", value: "To be finalized" },
-  { category: "Communication", value: "Wi-Fi / 4G Support" },
-  { category: "Sensors", value: "IMU, Ultrasonic, GPS" },
-  { category: "Camera", value: "1080p HD Wide-angle" },
-  { category: "Controller", value: "BhoomiBot OS (ESP32 Based)" },
-  { category: "Attachments", value: "Modular Quick-Release" },
+  { category: "Drive System", value: "Dual-Motor Differential Drive" },
+  { category: "Motor", value: "High-torque Industrial Electric" },
+  { category: "Battery", value: "48V 50Ah LiFePO4" },
+  { category: "Chassis", value: "Reinforced All-Steel Frame" },
+  { category: "Control Path", value: "Dual Path (Direct / Edge Relay)" },
+  { category: "Ground Clearance", value: "Adjustable (Task Dependent)" },
+  { category: "Operating Speed", value: "Up to 5 m/s (Software Capped)" },
+  { category: "Communication", value: "Wi-Fi / 4G (CloudBridge v13)" },
+  { category: "Sensors", value: "High-Precision GPS, IMU" },
+  { category: "Camera", value: "FHD 1080p (Dual Path Switchable)" },
+  { category: "OS Architecture", value: "BhoomiBot OS (ESP32 + Android)" },
+  { category: "Attachments", value: "Standard Modular Quick-Release" },
 ]
 
 export function Specifications() {

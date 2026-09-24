@@ -1,52 +1,35 @@
-// @ts-nocheck
 "use client"
 
-import React, { Suspense, useRef, useState } from "react"
-import { Canvas, useFrame } from "@react-three/fiber"
-import {
-  OrbitControls,
-  Stage,
-  PerspectiveCamera,
-  Environment,
-  Html,
-  Float,
-  ContactShadows,
-  KeyboardControls,
-  KeyboardControlsEntry,
-  useKeyboardControls
-} from "@react-three/drei"
-import * as THREE from "three"
+import React, { useState } from "react"
+import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
-import { Info, Maximize, Zap, Shield, Cpu } from "lucide-react"
+import { Zap, Cpu, Settings, Shield, Maximize2, Minimize2, Eye, Radio } from "lucide-react"
 
-enum Controls {
-  forward = "forward",
-  back = "back",
-  left = "left",
-  right = "right",
+interface HotspotProps {
+  x: string
+  y: string
+  title: string
+  description: string
+  icon: React.ElementType
 }
 
-const map: KeyboardControlsEntry<Controls>[] = [
-  { name: Controls.forward, keys: ["ArrowUp", "w", "W"] },
-  { name: Controls.back, keys: ["ArrowDown", "s", "S"] },
-  { name: Controls.left, keys: ["ArrowLeft", "a", "A"] },
-  { name: Controls.right, keys: ["ArrowRight", "d", "D"] },
-]
-
-function Hotspot({ position, title, description, icon: Icon }: any) {
+function Hotspot({ x, y, title, description, icon: Icon }: HotspotProps) {
   const [active, setActive] = useState(false)
 
   return (
-    <Html position={position} center distanceFactor={8}>
+    <div className="absolute z-20" style={{ left: x, top: y }}>
       <div className="relative group">
         <motion.button
           whileHover={{ scale: 1.2 }}
+          whileTap={{ scale: 0.9 }}
           onClick={() => setActive(!active)}
-          className={`w-6 h-6 rounded-full flex items-center justify-center border-2 transition-colors ${
-            active ? "bg-primary border-primary text-black" : "bg-black/50 border-white text-white"
+          className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all duration-300 shadow-lg backdrop-blur-md ${
+            active
+              ? "bg-primary border-primary text-black shadow-primary/50"
+              : "bg-black/70 border-white/40 text-white hover:border-primary hover:text-primary"
           }`}
         >
-          <Icon size={12} />
+          <Icon size={14} />
         </motion.button>
 
         <AnimatePresence>
@@ -55,252 +38,118 @@ function Hotspot({ position, title, description, icon: Icon }: any) {
               initial={{ opacity: 0, scale: 0.8, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: 10 }}
-              className="absolute bottom-8 left-1/2 -translate-x-1/2 w-48 bg-slate-900 text-white p-3 rounded-xl border border-white/10 shadow-2xl z-50 pointer-events-none"
+              className="absolute bottom-10 left-1/2 -translate-x-1/2 w-56 bg-slate-950/95 text-white p-3.5 rounded-2xl border border-white/15 shadow-2xl z-50 backdrop-blur-xl"
             >
-              <p className="text-[10px] font-black uppercase text-primary mb-1 tracking-widest">{title}</p>
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="p-1 rounded bg-primary/20 text-primary">
+                  <Icon size={12} />
+                </div>
+                <p className="text-[11px] font-black uppercase text-primary tracking-widest">{title}</p>
+              </div>
               <p className="text-[11px] leading-relaxed text-slate-300">{description}</p>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-    </Html>
-  )
-}
-
-function RobotModel({ attachment = "none" }: { attachment?: string }) {
-  const group = useRef<THREE.Group>(null)
-  const [, get] = useKeyboardControls<Controls>()
-
-  useFrame((state, delta) => {
-    if (!group.current) return
-
-    const { forward, back, left, right } = get()
-
-    // Simple movement logic
-    if (forward) group.current.position.z -= 2 * delta
-    if (back) group.current.position.z += 2 * delta
-    if (left) group.current.rotation.y += 2 * delta
-    if (right) group.current.rotation.y -= 2 * delta
-  })
-
-  return (
-    <group ref={group} dispose={null}>
-      <Float speed={2} rotationIntensity={0.5} floatIntensity={0.5}>
-        {/* Main Body */}
-        <mesh castShadow receiveShadow position={[0, 0.25, 0]}>
-          <boxGeometry args={[1, 0.4, 1.5]} />
-          <meshStandardMaterial
-            color="#1a1a1a"
-            metalness={0.9}
-            roughness={0.1}
-            envMapIntensity={1}
-          />
-        </mesh>
-
-        {/* Chassis Accents */}
-        <mesh position={[0, 0.46, 0]}>
-          <boxGeometry args={[0.95, 0.05, 1.45]} />
-          <meshStandardMaterial color="#666" metalness={1} roughness={0.2} />
-        </mesh>
-
-        {/* Wheels with PBR */}
-        {[[-0.6, 0.1, 0.55], [0.6, 0.1, 0.55], [-0.6, 0.1, -0.55], [0.6, 0.1, -0.55]].map((pos, i) => (
-          <group key={i} position={pos as [number, number, number]}>
-            <mesh rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.3, 0.3, 0.25, 32]} />
-              <meshStandardMaterial color="#080808" roughness={0.8} metalness={0.2} />
-            </mesh>
-            {/* Hubcap */}
-            <mesh rotation={[0, 0, Math.PI / 2]} position={[pos[0] > 0 ? 0.05 : -0.05, 0, 0]}>
-               <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
-               <meshStandardMaterial color={i < 2 ? "#10b981" : "#333"} metalness={0.8} roughness={0.2} />
-            </mesh>
-          </group>
-        ))}
-
-        {/* Sensor Tower */}
-        <group position={[0, 0.6, 0.5]}>
-          <mesh castShadow>
-            <cylinderGeometry args={[0.08, 0.12, 0.4, 16]} />
-            <meshStandardMaterial color="#222" metalness={0.8} />
-          </mesh>
-          <mesh position={[0, 0.25, 0]}>
-            <sphereGeometry args={[0.1, 32, 32]} />
-            <meshStandardMaterial color="#10b981" emissive="#10b981" emissiveIntensity={2} />
-          </mesh>
-          <Hotspot
-            position={[0, 0.4, 0]}
-            title="AI Vision System"
-            description="Dual 4K cameras with depth sensing for autonomous obstacle avoidance and crop identification."
-            icon={Cpu}
-          />
-        </group>
-
-        {/* Battery Pack Hotspot */}
-        <Hotspot
-          position={[0, 0.3, -0.4]}
-          title="Battery Core"
-          description="High-density 10kWh Li-ion pack providing 8-12 hours of continuous operation."
-          icon={Zap}
-        />
-
-        {/* Safety System Hotspot */}
-        <Hotspot
-          position={[0, 0.5, 0]}
-          title="Security Shell"
-          description="Industrial-grade IP67 rated chassis with emergency physical stop access."
-          icon={Shield}
-        />
-
-        {/* Attachments with Animations */}
-        <AnimatePresence mode="wait">
-          {attachment === "plough" && (
-            <motion.group
-              // @ts-ignore
-              key="plough"
-              initial={{ scale: 0, y: -0.5 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0, y: -0.5 }}
-              position={[0, 0.1, -0.9]}
-            >
-              <mesh rotation={[0.5, 0, 0]}>
-                <boxGeometry args={[0.9, 0.1, 0.5]} />
-                <meshStandardMaterial color="#444" metalness={1} roughness={0.3} />
-              </mesh>
-              {[[-0.3, -0.1, 0], [0, -0.1, 0.1], [0.3, -0.1, 0]].map((p, i) => (
-                 <mesh key={i} position={p as [number, number, number]} rotation={[0.2, 0, 0]}>
-                   <boxGeometry args={[0.05, 0.4, 0.05]} />
-                   <meshStandardMaterial color="#222" />
-                 </mesh>
-              ))}
-            </motion.group>
-          )}
-
-          {attachment === "sprayer" && (
-            <motion.group
-              // @ts-ignore
-              key="sprayer"
-              initial={{ scale: 0, z: 0 }}
-              animate={{ scale: 1, z: -0.3 }}
-              exit={{ scale: 0, z: 0 }}
-              position={[0, 0.6, -0.3]}
-            >
-              <mesh>
-                <cylinderGeometry args={[0.45, 0.45, 0.6, 32]} />
-                <meshStandardMaterial color="#ffffff" roughness={0.2} metalness={0.1} />
-              </mesh>
-              <mesh position={[0, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-                 <cylinderGeometry args={[0.04, 0.04, 1.8, 16]} />
-                 <meshStandardMaterial color="#ddd" metalness={0.8} />
-              </mesh>
-            </motion.group>
-          )}
-
-          {attachment === "cargo" && (
-            <motion.group
-              // @ts-ignore
-              key="cargo"
-              initial={{ scale: 0, y: 1 }}
-              animate={{ scale: 1, y: 0.55 }}
-              exit={{ scale: 0, y: 1 }}
-              position={[0, 0.55, -0.2]}
-            >
-              <mesh castShadow>
-                <boxGeometry args={[1.1, 0.15, 1.3]} />
-                <meshStandardMaterial color="#222" metalness={0.5} roughness={0.5} />
-              </mesh>
-              <mesh position={[0, 0.15, 0]}>
-                 <boxGeometry args={[1.05, 0.1, 1.25]} />
-                 <meshStandardMaterial color="#111" />
-              </mesh>
-            </motion.group>
-          )}
-        </AnimatePresence>
-      </Float>
-    </group>
-  )
-}
-
-export default function RobotCanvas({ attachment = "none" }: { attachment?: string }) {
-  const [isFullscreen, setIsFullscreen] = useState(false)
-
-  return (
-    <div className={`relative transition-all duration-500 ${isFullscreen ? "fixed inset-0 z-[100] bg-black" : "w-full h-[400px] md:h-[600px] cursor-grab active:cursor-grabbing"}`}>
-      <KeyboardControls map={map}>
-        <Canvas shadows gl={{ antialias: true, preserveDrawingBuffer: true }}>
-          <PerspectiveCamera makeDefault position={[4, 3, 6]} fov={45} />
-          <Suspense fallback={null}>
-            <Environment preset="city" />
-            <Stage
-              intensity={0.8}
-              environment="city"
-              adjustCamera={false}
-              contactShadow={{ blur: 2, opacity: 0.5 }}
-            >
-              <RobotModel attachment={attachment} />
-            </Stage>
-            <OrbitControls
-              makeDefault
-              enableZoom={!isFullscreen}
-              minPolarAngle={Math.PI / 4}
-              maxPolarAngle={Math.PI / 2}
-              autoRotate={!isFullscreen}
-              autoRotateSpeed={0.5}
-            />
-            <ContactShadows
-              position={[0, -0.01, 0]}
-              opacity={0.4}
-              scale={10}
-              blur={2}
-              far={1}
-            />
-          </Suspense>
-        </Canvas>
-      </KeyboardControls>
-
-      {/* Overlay UI Controls */}
-      <div className="absolute bottom-6 right-6 flex flex-col gap-3">
-        <Button
-          size="icon"
-          variant="outline"
-          className="rounded-full bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-primary hover:text-black transition-all"
-          onClick={() => setIsFullscreen(!isFullscreen)}
-        >
-          <Maximize size={18} />
-        </Button>
-        <Button
-          size="icon"
-          variant="outline"
-          className="rounded-full bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-primary hover:text-black transition-all"
-          onClick={() => alert("AR Mode coming soon to WebXR compatible devices!")}
-        >
-          <span className="text-[10px] font-bold">AR</span>
-        </Button>
-      </div>
-
-      <div className="absolute top-6 left-6 pointer-events-none">
-        <div className="bg-black/50 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-white">Interactive 3D Preview</span>
-        </div>
-        <div className="mt-2 text-[8px] text-white/40 uppercase font-black tracking-widest ml-4">
-          Use WASD or Arrows to drive
-        </div>
-      </div>
     </div>
   )
 }
 
-function Button({ children, size, variant, className, onClick }: any) {
-  const sizeClasses = size === "icon" ? "w-10 h-10 p-0" : "px-4 py-2"
-  const variantClasses = variant === "outline" ? "border" : "bg-primary text-black"
+export default function RobotCanvas() {
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  const hotspots = [
+    {
+      x: "52%",
+      y: "40%",
+      title: "LiFePO4 Energy Core",
+      description: "48V 50Ah LiFePO4 battery pack with integrated smart BMS for continuous field operations.",
+      icon: Zap
+    },
+    {
+      x: "35%",
+      y: "55%",
+      title: "Dual Drive Motors",
+      description: "High-torque brushless DC motors enabling differential steering across rough farm terrain.",
+      icon: Settings
+    },
+    {
+      x: "50%",
+      y: "22%",
+      title: "Bhoomi Vision AI",
+      description: "Real-time row following, crop health monitoring and autonomous obstacle avoidance.",
+      icon: Cpu
+    },
+    {
+      x: "70%",
+      y: "60%",
+      title: "Heavy Chassis",
+      description: "Reinforced steel structural frame rated for rugged agricultural and logistics operations.",
+      icon: Shield
+    }
+  ]
 
   return (
-    <button
-      onClick={onClick}
-      className={`flex items-center justify-center rounded-lg font-medium transition-all ${sizeClasses} ${variantClasses} ${className}`}
+    <div
+      className={`relative overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-950 transition-all duration-500 shadow-2xl ${
+        isFullscreen ? "fixed inset-4 z-[100] h-[calc(100vh-2rem)]" : "w-full h-[400px] md:h-[600px]"
+      }`}
     >
-      {children}
-    </button>
+      {/* Background Grid & Radial Lighting Glow */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,197,94,0.15)_0,transparent_70%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293710_1px,transparent_1px),linear-gradient(to_bottom,#1f293710_1px,transparent_1px)] bg-[size:2rem_2rem] pointer-events-none" />
+
+      {/* Main Digital Twin Image Display */}
+      <div className="relative w-full h-full flex items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8 }}
+          className="relative w-full h-full flex items-center justify-center"
+        >
+          <Image
+            src="/robots/v2.4-twin.png"
+            alt="BhoomiBot v2.4 Digital Twin"
+            fill
+            priority
+            className="object-contain drop-shadow-[0_20px_50px_rgba(34,197,94,0.2)] rounded-2xl"
+          />
+
+          {/* Interactive Hotspots */}
+          {hotspots.map((spot) => (
+            <Hotspot key={spot.title} {...spot} />
+          ))}
+        </motion.div>
+      </div>
+
+      {/* Header Badge */}
+      <div className="absolute top-6 left-6 z-30">
+        <div className="bg-black/80 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-3 shadow-lg">
+          <div className="w-2.5 h-2.5 rounded-full bg-primary animate-ping" />
+          <span className="text-[11px] font-black uppercase tracking-widest text-white">v2.4 Digital Twin</span>
+        </div>
+      </div>
+
+      {/* Live Status Telemetry Badge */}
+      <div className="absolute top-6 right-6 z-30 hidden sm:flex items-center gap-3">
+        <div className="bg-black/80 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-full flex items-center gap-2 text-slate-300 text-[10px] font-mono">
+          <Radio size={12} className="text-primary animate-pulse" />
+          <span>LIVE LINK ACTIVE</span>
+        </div>
+        <button
+          onClick={() => setIsFullscreen(!isFullscreen)}
+          className="bg-black/80 backdrop-blur-md border border-white/10 p-2 rounded-full text-white hover:text-primary transition-colors"
+          title="Toggle Fullscreen"
+        >
+          {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        </button>
+      </div>
+
+      {/* Footer Hotspot Hint */}
+      <div className="absolute bottom-6 left-6 z-30 text-[10px] text-slate-400 font-mono uppercase tracking-[0.2em] flex items-center gap-2 bg-black/60 px-3 py-1.5 rounded-lg border border-white/5 backdrop-blur-sm">
+        <Eye size={12} className="text-primary" />
+        <span>Click icons on chassis to view twin telemetry</span>
+      </div>
+    </div>
   )
 }

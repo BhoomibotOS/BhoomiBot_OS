@@ -1,53 +1,55 @@
+import { Navbar } from "@/components/Navbar"
 import { Hero } from "@/components/sections/Hero"
 import { MeetBhoomiBot } from "@/components/sections/MeetBhoomiBot"
-import { Showcase } from "@/components/sections/Showcase"
-import { MissionPlanner } from "@/components/sections/MissionPlanner"
-import { ActionDemo } from "@/components/sections/ActionDemo"
-import { WhyBhoomiBot } from "@/components/sections/WhyBhoomiBot"
-import { Agriculture } from "@/components/sections/Agriculture"
-import { Attachments } from "@/components/sections/Attachments"
-import { Logistics } from "@/components/sections/Logistics"
-import { RemoteControl } from "@/components/sections/RemoteControl"
-import { OperatingModes } from "@/components/sections/OperatingModes"
 import { Technology } from "@/components/sections/Technology"
 import { Specifications } from "@/components/sections/Specifications"
-import { HowItWorks } from "@/components/sections/HowItWorks"
+import { Agriculture } from "@/components/sections/Agriculture"
+import { Logistics } from "@/components/sections/Logistics"
+import { OperatingModes } from "@/components/sections/OperatingModes"
 import { Safety } from "@/components/sections/Safety"
-import { RealWorldApplications } from "@/components/sections/RealWorldApplications"
-import { CaseStudies } from "@/components/sections/CaseStudies"
-import { ImageGallery } from "@/components/sections/ImageGallery"
-import { Comparison } from "@/components/sections/Comparison"
-import { ROICalculator } from "@/components/sections/ROICalculator"
 import { FAQ } from "@/components/sections/FAQ"
-import { About } from "@/components/sections/About"
 import { Contact } from "@/components/sections/Contact"
+import { Footer } from "@/components/Footer"
 
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col">
-      <Hero />
-      <MeetBhoomiBot />
-      <Showcase />
-      <ActionDemo />
-      <MissionPlanner />
-      <WhyBhoomiBot />
-      <Agriculture />
-      <Attachments />
-      <Logistics />
-      <RemoteControl />
-      <OperatingModes />
-      <Technology />
-      <Specifications />
-      <HowItWorks />
-      <Safety />
-      <RealWorldApplications />
-      <CaseStudies />
-      <ImageGallery />
-      <Comparison />
-      <ROICalculator />
-      <FAQ />
-      <About />
-      <Contact />
+      <Navbar />
+
+      {/* 1. Introduction */}
+      <div id="home">
+        <Hero />
+      </div>
+
+      {/* 2. Hardware Spotlight */}
+      <div id="robot" className="bg-slate-50 dark:bg-zinc-950 py-10">
+        <MeetBhoomiBot />
+        <Specifications />
+      </div>
+
+      {/* 3. Operational Logic */}
+      <div id="technology">
+        <Technology />
+        <OperatingModes />
+      </div>
+
+      {/* 4. Use Cases */}
+      <div id="agriculture">
+        <Agriculture />
+        <Logistics />
+      </div>
+
+      {/* 5. Support & Reliability */}
+      <div id="about">
+        <Safety />
+        <FAQ />
+      </div>
+
+      <div id="contact">
+        <Contact />
+      </div>
+
+      <Footer />
     </main>
   )
 }

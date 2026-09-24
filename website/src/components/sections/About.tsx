@@ -46,7 +46,7 @@ export function About() {
             className="order-1 lg:order-2 rounded-[3rem] overflow-hidden shadow-2xl border-8 border-white dark:border-zinc-900"
           >
             <Image
-              src="/robots/team-work.jpg"
+              src="/robots/bhoomibot-chassis.jpg"
               alt="BhoomiBot Team Work"
               width={800}
               height={600}
@@ -73,7 +73,7 @@ export function About() {
             >
               <div className="aspect-[3/4] rounded-[2.5rem] overflow-hidden bg-white dark:bg-zinc-900 border-8 border-white dark:border-zinc-900 shadow-xl mb-6">
                 <Image
-                  src="/team/ChatGPT Image Aug 23, 2026, 07_20_21 PM.png"
+                  src="/team/team-1.png"
                   alt="Technical Expert"
                   width={600}
                   height={800}
@@ -95,7 +95,7 @@ export function About() {
             >
               <div className="aspect-[3/4] rounded-[2.5rem] overflow-hidden bg-white dark:bg-zinc-900 border-8 border-white dark:border-zinc-900 shadow-xl mb-6">
                 <Image
-                  src="/team/ChatGPT Image Aug 23, 2026, 07_23_07 PM.png"
+                  src="/team/team-2.png"
                   alt="Design Expert"
                   width={600}
                   height={800}

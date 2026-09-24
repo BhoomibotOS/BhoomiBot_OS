@@ -4,8 +4,9 @@ import { RobotRelay } from "./src/server/relay-logic.js";
 
 /**
  * BhoomiBot Custom Cloudflare Worker Entry Point
- * This wrapper intercepts the relay API path for video streaming
- * while letting OpenNext handle the Next.js website.
+ * This wrapper intercepts the relay API path for video streaming,
+ * serves static assets directly via Cloudflare Assets,
+ * and delegates website requests to OpenNext.
  */
 export default {
   async fetch(request, env, ctx) {
@@ -24,7 +25,15 @@ export default {
       }
     }
 
-    // 2. Main Website Logic
+    // 2. Serve static assets (images, icons, favicons, fonts, CSS/JS) via env.ASSETS
+    if (env.ASSETS) {
+      const assetResponse = await env.ASSETS.fetch(request);
+      if (assetResponse.status !== 404) {
+        return assetResponse;
+      }
+    }
+
+    // 3. Main Website Logic
     // Delegates everything else to the OpenNext bundle
     return handler.fetch(request, env, ctx);
   },

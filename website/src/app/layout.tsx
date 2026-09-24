@@ -14,6 +14,11 @@ export const metadata: Metadata = {
   title: "BhoomiBot AI Labs | Smarter Robotics for Agriculture & Logistics",
   description: "BhoomiBot is a modular robotic platform designed for agriculture, material handling and autonomous field operations in India.",
   keywords: "Agricultural robot India, Farming robot, Autonomous agricultural robot, Electric agricultural robot, Farm robotics, BhoomiBot",
+  icons: {
+    icon: "/robots/web_icon.png",
+    shortcut: "/robots/web_icon.png",
+    apple: "/robots/web_icon.png",
+  },
 }
 
 export default function RootLayout({
