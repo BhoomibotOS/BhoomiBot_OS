@@ -5,6 +5,7 @@ import Link from "next/link"
 export function Footer() {
   const links = [
     { name: "Home", href: "#home" },
+    { name: "Services", href: "#services" },
     { name: "Robot", href: "#robot" },
     { name: "Agriculture", href: "#agriculture" },
     { name: "Applications", href: "#applications" },
@@ -68,7 +69,7 @@ export function Footer() {
               </p>
               <p>
                 <span className="block font-bold text-slate-300">Location</span>
-                Pune, Maharashtra, India
+                Electronic city phase 1, Bengaluru, India ,560100
               </p>
             </div>
           </div>

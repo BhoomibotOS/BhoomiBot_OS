@@ -1,6 +1,7 @@
 import { Navbar } from "@/components/Navbar"
 import { Hero } from "@/components/sections/Hero"
 import { MeetBhoomiBot } from "@/components/sections/MeetBhoomiBot"
+import { Services } from "@/components/sections/Services"
 import { Technology } from "@/components/sections/Technology"
 import { Specifications } from "@/components/sections/Specifications"
 import { Agriculture } from "@/components/sections/Agriculture"
@@ -21,25 +22,30 @@ export default function Home() {
         <Hero />
       </div>
 
-      {/* 2. Hardware Spotlight */}
+      {/* 2. Engineering & Mechatronics Services */}
+      <div id="services">
+        <Services />
+      </div>
+
+      {/* 3. Hardware Spotlight */}
       <div id="robot" className="bg-slate-50 dark:bg-zinc-950 py-10">
         <MeetBhoomiBot />
         <Specifications />
       </div>
 
-      {/* 3. Operational Logic */}
+      {/* 4. Operational Logic */}
       <div id="technology">
         <Technology />
         <OperatingModes />
       </div>
 
-      {/* 4. Use Cases */}
+      {/* 5. Use Cases */}
       <div id="agriculture">
         <Agriculture />
         <Logistics />
       </div>
 
-      {/* 5. Support & Reliability */}
+      {/* 6. Support & Reliability */}
       <div id="about">
         <Safety />
         <FAQ />
