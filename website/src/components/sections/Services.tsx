@@ -108,8 +108,7 @@ export function Services() {
               </div>
 
               <Button
-                variant="outline"
-                className="w-full justify-between font-bold text-xs uppercase tracking-widest rounded-xl border-white/10 hover:border-primary hover:bg-primary hover:text-black transition-all"
+                className="w-full justify-between font-bold text-xs uppercase tracking-widest rounded-xl bg-primary/10 text-primary border border-primary/30 hover:bg-primary hover:text-black transition-all"
                 asChild
               >
                 <Link href="#contact">
@@ -124,14 +123,14 @@ export function Services() {
         {/* Bottom Banner */}
         <div className="mt-16 p-10 rounded-[2.5rem] bg-gradient-to-r from-zinc-900 via-zinc-950 to-zinc-900 border border-white/10 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="max-w-2xl">
-            <h3 className="text-2xl md:text-3xl font-black tracking-tight mb-2">
+            <h3 className="text-2xl md:text-3xl font-black tracking-tight mb-2 text-white">
               Need Custom Hardware or Prototyping?
             </h3>
             <p className="text-slate-400 text-sm leading-relaxed">
               From SolidWorks CAD design to custom STM32 VCU controllers and CAN Bus networks, we bring your industrial hardware ideas to life.
             </p>
           </div>
-          <Button size="lg" className="font-bold shrink-0 px-8 py-6 rounded-2xl text-sm uppercase tracking-widest shadow-xl" asChild>
+          <Button size="lg" className="font-bold shrink-0 px-8 py-6 rounded-2xl text-sm uppercase tracking-widest shadow-xl bg-primary text-black hover:bg-primary/90" asChild>
             <Link href="#contact">
               Request R&D Proposal
             </Link>
