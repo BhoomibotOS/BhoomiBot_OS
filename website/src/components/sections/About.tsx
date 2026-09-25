@@ -6,7 +6,7 @@ import Image from "next/image"
 export function About() {
   return (
     <section id="about" className="py-24 bg-slate-50 dark:bg-zinc-950/50">
-      <div className="container mx-auto px-4">
+      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div className="order-2 lg:order-1">
              <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-6">About BhoomiBot AI Labs</h2>

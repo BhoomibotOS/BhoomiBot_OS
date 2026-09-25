@@ -3,7 +3,12 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Video, Activity, Wifi, AlertCircle, PlayCircle, ShieldAlert, RefreshCw, Camera } from 'lucide-react'
 
-export function LiveConsole() {
+interface LiveConsoleProps {
+  robotId?: string
+  sessionId?: string
+}
+
+export function LiveConsole({ robotId = 'BHOOMI-001', sessionId = '123' }: LiveConsoleProps = {}) {
   const [status, setStatus] = useState('offline')
   const [frameCount, setFrameCount] = useState(0)
   const [isRobotOnline, setIsRobotOnline] = useState(false)

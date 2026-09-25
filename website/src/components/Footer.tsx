@@ -1,17 +1,15 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 
 export function Footer() {
   const links = [
-    { name: "Home", href: "#home" },
-    { name: "Services", href: "#services" },
-    { name: "Robot", href: "#robot" },
-    { name: "Agriculture", href: "#agriculture" },
-    { name: "Applications", href: "#applications" },
-    { name: "Technology", href: "#technology" },
-    { name: "About", href: "#about" },
-    { name: "Contact", href: "#contact" },
+    { name: "Home", href: "/#home" },
+    { name: "Live Console", href: "/live" },
+    { name: "Services", href: "/#services" },
+    { name: "About", href: "/#about" },
+    { name: "Contact", href: "/#contact" },
   ]
 
   const legal = [
@@ -21,11 +19,18 @@ export function Footer() {
 
   return (
     <footer className="bg-slate-900 text-white py-16 border-t border-white/10">
-      <div className="container mx-auto px-4">
+      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           <div className="space-y-6">
-            <Link href="/" className="flex items-center space-x-2">
-              <span className="text-2xl font-black tracking-tighter text-white">
+            <Link href="/" className="flex items-center space-x-3">
+              <Image
+                src="/robots/web_icon2.png"
+                alt="BhoomiBot Logo"
+                width={52}
+                height={52}
+                className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 object-contain shrink-0"
+              />
+              <span className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tighter text-white">
                 BhoomiBot <span className="text-primary">AI Labs</span>
               </span>
             </Link>

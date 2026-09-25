@@ -28,8 +28,8 @@ const applications = [
 
 export function Agriculture() {
   return (
-    <section id="agriculture" className="py-24 bg-slate-900 text-white">
-      <div className="container mx-auto px-4">
+    <section id="agriculture" className="py-16 sm:py-24 bg-slate-900 text-white">
+      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="flex flex-col items-center text-center mb-16">
           <div className="inline-block px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-bold tracking-wider uppercase mb-4">
             Indian Agriculture
@@ -48,19 +48,19 @@ export function Agriculture() {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              className="relative group h-[400px] rounded-3xl overflow-hidden"
+              className="relative group h-[280px] sm:h-[350px] lg:h-[400px] rounded-2xl sm:rounded-3xl overflow-hidden"
             >
               <Image
                 src={app.image}
                 alt={app.name}
                 width={800}
                 height={600}
-                className="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-110 transition-all duration-500"
+                className="w-full h-full object-cover grayscale-0 sm:grayscale sm:group-hover:grayscale-0 sm:group-hover:scale-110 transition-all duration-500"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
-              <div className="absolute bottom-0 left-0 p-8">
-                <h3 className="text-2xl font-bold mb-2">{app.name}</h3>
-                <p className="text-slate-300 text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+              <div className="absolute bottom-0 left-0 p-6 sm:p-8">
+                <h3 className="text-xl sm:text-2xl font-bold mb-2">{app.name}</h3>
+                <p className="text-slate-300 text-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300">
                   {app.desc}
                 </p>
               </div>

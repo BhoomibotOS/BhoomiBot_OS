@@ -27,8 +27,8 @@ const modes = [
 
 export function OperatingModes() {
   return (
-    <section className="py-24 bg-slate-900 text-white">
-      <div className="container mx-auto px-4">
+    <section className="py-16 sm:py-24 bg-slate-900 text-white">
+      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-6">Operating Modes</h2>
           <p className="text-slate-400 text-lg">

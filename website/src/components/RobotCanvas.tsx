@@ -1,9 +1,10 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
+import { createPortal } from "react-dom"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
-import { Zap, Cpu, Settings, Shield, Maximize2, Minimize2, Eye, Radio } from "lucide-react"
+import { Zap, Cpu, Settings, Shield, Maximize2, Minimize2 } from "lucide-react"
 
 interface HotspotProps {
   x: string
@@ -11,6 +12,10 @@ interface HotspotProps {
   title: string
   description: string
   icon: React.ElementType
+}
+
+interface RobotCanvasProps {
+  attachment?: string
 }
 
 function Hotspot({ x, y, title, description, icon: Icon }: HotspotProps) {
@@ -23,7 +28,7 @@ function Hotspot({ x, y, title, description, icon: Icon }: HotspotProps) {
           whileHover={{ scale: 1.2 }}
           whileTap={{ scale: 0.9 }}
           onClick={() => setActive(!active)}
-          className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all duration-300 shadow-lg backdrop-blur-md ${
+          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 transition-all duration-300 shadow-lg backdrop-blur-md ${
             active
               ? "bg-primary border-primary text-black shadow-primary/50"
               : "bg-black/70 border-white/40 text-white hover:border-primary hover:text-primary"
@@ -38,7 +43,7 @@ function Hotspot({ x, y, title, description, icon: Icon }: HotspotProps) {
               initial={{ opacity: 0, scale: 0.8, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: 10 }}
-              className="absolute bottom-10 left-1/2 -translate-x-1/2 w-56 bg-slate-950/95 text-white p-3.5 rounded-2xl border border-white/15 shadow-2xl z-50 backdrop-blur-xl"
+              className="absolute bottom-10 left-1/2 -translate-x-1/2 w-56 sm:w-64 bg-slate-950/95 text-white p-3.5 rounded-2xl border border-white/15 shadow-2xl z-50 backdrop-blur-xl"
             >
               <div className="flex items-center gap-2 mb-1.5">
                 <div className="p-1 rounded bg-primary/20 text-primary">
@@ -46,7 +51,7 @@ function Hotspot({ x, y, title, description, icon: Icon }: HotspotProps) {
                 </div>
                 <p className="text-[11px] font-black uppercase text-primary tracking-widest">{title}</p>
               </div>
-              <p className="text-[11px] leading-relaxed text-slate-300">{description}</p>
+              <p className="text-[11px] sm:text-xs leading-relaxed text-slate-300">{description}</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -55,8 +60,23 @@ function Hotspot({ x, y, title, description, icon: Icon }: HotspotProps) {
   )
 }
 
-export default function RobotCanvas() {
+export default function RobotCanvas({ attachment }: RobotCanvasProps = {}) {
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFullscreen) {
+        setIsFullscreen(false)
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [isFullscreen])
 
   const hotspots = [
     {
@@ -89,67 +109,68 @@ export default function RobotCanvas() {
     }
   ]
 
-  return (
-    <div
-      className={`relative overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-950 transition-all duration-500 shadow-2xl ${
-        isFullscreen ? "fixed inset-4 z-[100] h-[calc(100vh-2rem)]" : "w-full h-[400px] md:h-[600px]"
-      }`}
-    >
+  const canvasContent = (
+    <div className="relative w-full h-full flex items-center justify-center p-4 sm:p-6">
       {/* Background Grid & Radial Lighting Glow */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,197,94,0.15)_0,transparent_70%)] pointer-events-none" />
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293710_1px,transparent_1px),linear-gradient(to_bottom,#1f293710_1px,transparent_1px)] bg-[size:2rem_2rem] pointer-events-none" />
 
       {/* Main Digital Twin Image Display */}
-      <div className="relative w-full h-full flex items-center justify-center p-6">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8 }}
-          className="relative w-full h-full flex items-center justify-center"
-        >
-          <Image
-            src="/robots/v2.4-twin.png"
-            alt="BhoomiBot v2.4 Digital Twin"
-            fill
-            priority
-            className="object-contain drop-shadow-[0_20px_50px_rgba(34,197,94,0.2)] rounded-2xl"
-          />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.8 }}
+        className="relative w-full h-full flex items-center justify-center"
+      >
+        <Image
+          src="/robots/v2.4-twin.png"
+          alt="BhoomiBot v2.4 Digital Twin"
+          fill
+          priority
+          className="object-contain drop-shadow-[0_20px_50px_rgba(34,197,94,0.2)] rounded-2xl"
+        />
 
-          {/* Interactive Hotspots */}
-          {hotspots.map((spot) => (
-            <Hotspot key={spot.title} {...spot} />
-          ))}
-        </motion.div>
-      </div>
+        {/* Interactive Hotspots */}
+        {hotspots.map((spot) => (
+          <Hotspot key={spot.title} {...spot} />
+        ))}
+      </motion.div>
 
       {/* Header Badge */}
-      <div className="absolute top-6 left-6 z-30">
-        <div className="bg-black/80 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-3 shadow-lg">
-          <div className="w-2.5 h-2.5 rounded-full bg-primary animate-ping" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-white">v2.4 Digital Twin</span>
+      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-30">
+        <div className="bg-black/80 backdrop-blur-md border border-white/10 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full flex items-center gap-2.5 sm:gap-3 shadow-lg">
+          <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-primary animate-ping" />
+          <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-white">v2.4 Digital Twin</span>
         </div>
       </div>
 
-      {/* Live Status Telemetry Badge */}
-      <div className="absolute top-6 right-6 z-30 hidden sm:flex items-center gap-3">
-        <div className="bg-black/80 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-full flex items-center gap-2 text-slate-300 text-[10px] font-mono">
-          <Radio size={12} className="text-primary animate-pulse" />
-          <span>LIVE LINK ACTIVE</span>
-        </div>
+      {/* Fullscreen Toggle Button */}
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-30 flex items-center gap-3">
         <button
           onClick={() => setIsFullscreen(!isFullscreen)}
-          className="bg-black/80 backdrop-blur-md border border-white/10 p-2 rounded-full text-white hover:text-primary transition-colors"
-          title="Toggle Fullscreen"
+          className="bg-black/80 backdrop-blur-md border border-white/10 p-2.5 rounded-full text-white hover:text-primary transition-colors shadow-lg"
+          title={isFullscreen ? "Exit Fullscreen" : "Toggle Fullscreen"}
         >
-          {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
         </button>
       </div>
-
-      {/* Footer Hotspot Hint */}
-      <div className="absolute bottom-6 left-6 z-30 text-[10px] text-slate-400 font-mono uppercase tracking-[0.2em] flex items-center gap-2 bg-black/60 px-3 py-1.5 rounded-lg border border-white/5 backdrop-blur-sm">
-        <Eye size={12} className="text-primary" />
-        <span>Click icons on chassis to view twin telemetry</span>
-      </div>
     </div>
+  )
+
+  return (
+    <>
+      <div className="relative w-full h-full min-h-[300px] sm:min-h-[400px] overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-950 transition-all duration-500 shadow-2xl">
+        {canvasContent}
+      </div>
+
+      {isFullscreen && mounted && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-2xl p-2 sm:p-6 flex items-center justify-center animate-in fade-in duration-300">
+          <div className="relative w-full h-full max-w-[1800px] max-h-[1000px] overflow-hidden rounded-3xl border border-white/15 bg-slate-950 shadow-2xl">
+            {canvasContent}
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   )
 }

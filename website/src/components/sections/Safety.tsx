@@ -15,8 +15,8 @@ const safetyFeatures = [
 
 export function Safety() {
   return (
-    <section className="py-24 bg-slate-900 text-white overflow-hidden">
-      <div className="container mx-auto px-4">
+    <section className="py-16 sm:py-24 bg-slate-900 text-white overflow-hidden">
+      <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>
             <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-6">Designed With Safety in Mind</h2>
@@ -45,27 +45,28 @@ export function Safety() {
             viewport={{ once: true }}
             className="relative"
           >
-            <div className="rounded-[3rem] overflow-hidden border-8 border-slate-800 shadow-2xl relative">
+            <div className="rounded-3xl sm:rounded-[3rem] overflow-hidden border-4 sm:border-8 border-slate-800 shadow-2xl relative">
               <Image
                 src="/robots/safety-systems.jpg"
                 alt="Safety Systems"
                 width={800}
                 height={600}
-                className="w-full h-[500px] object-cover opacity-50"
+                className="w-full h-[300px] sm:h-[400px] md:h-[500px] object-cover opacity-50"
               />
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-6 border-2 border-primary animate-pulse">
-                    <Shield size={40} className="text-primary" />
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4 sm:mb-6 border-2 border-primary animate-pulse">
+                    <Shield size={32} className="text-primary sm:hidden" />
+                    <Shield size={40} className="text-primary hidden sm:block" />
                   </div>
-                  <p className="text-2xl font-black tracking-tighter uppercase italic">Safety Active</p>
+                  <p className="text-xl sm:text-2xl font-black tracking-tighter uppercase italic">Safety Active</p>
                 </div>
               </div>
             </div>
 
             {/* HUD element */}
-            <div className="absolute -bottom-6 -right-6 bg-slate-800 border border-white/10 p-6 rounded-3xl shadow-2xl z-10 max-w-[240px]">
-               <div className="flex items-center gap-2 mb-4">
+            <div className="absolute -bottom-4 right-2 sm:-bottom-6 sm:-right-6 bg-slate-800 border border-white/10 p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-2xl z-10 max-w-[200px] sm:max-w-[240px]">
+               <div className="flex items-center gap-2 mb-3 sm:mb-4">
                  <div className="w-2 h-2 rounded-full bg-green-500" />
                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">All Systems Normal</span>
                </div>

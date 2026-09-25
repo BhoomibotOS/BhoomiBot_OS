@@ -15,9 +15,9 @@ export const metadata: Metadata = {
   description: "BhoomiBot is a modular robotic platform designed for agriculture, material handling and autonomous field operations in India.",
   keywords: "Agricultural robot India, Farming robot, Autonomous agricultural robot, Electric agricultural robot, Farm robotics, BhoomiBot",
   icons: {
-    icon: "/robots/web_icon.png",
-    shortcut: "/robots/web_icon.png",
-    apple: "/robots/web_icon.png",
+    icon: "/robots/web_icon2.png",
+    shortcut: "/robots/web_icon2.png",
+    apple: "/robots/web_icon2.png",
   },
 }
 

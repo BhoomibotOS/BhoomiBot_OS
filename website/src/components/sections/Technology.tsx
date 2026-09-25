@@ -38,21 +38,18 @@ const techCards = [
 
 export function Technology() {
   return (
-    <section id="technology" className="py-24 bg-white dark:bg-black">
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
-          <div className="max-w-2xl">
+    <section id="technology" className="py-16 sm:py-24 bg-white dark:bg-black">
+      <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16">
+        <div className="mb-12 sm:mb-16">
+          <div className="max-w-3xl">
             <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-4">The Tech Behind BhoomiBot</h2>
-            <p className="text-slate-600 dark:text-slate-400 text-lg">
+            <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg">
               Engineering a reliable robotic future requires a robust foundation of hardware and software.
             </p>
           </div>
-          <div className="text-primary font-black text-xl italic tracking-tighter uppercase">
-            BhoomiBot OS v1.0
-          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6 sm:gap-8">
           {techCards.map((tech, index) => (
             <motion.div
               key={tech.title}

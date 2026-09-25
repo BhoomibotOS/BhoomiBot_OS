@@ -16,16 +16,16 @@ export function MeetBhoomiBot() {
   ]
 
   return (
-    <section id="robot" className="py-24 bg-slate-50 dark:bg-zinc-950/50">
-      <div className="container mx-auto px-4">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-6">Meet BhoomiBot</h2>
-          <p className="text-slate-600 dark:text-slate-400 text-lg">
+    <section id="robot" className="py-16 sm:py-24 bg-slate-50 dark:bg-zinc-950/50">
+      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12">
+        <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
+          <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 sm:mb-6">Meet BhoomiBot</h2>
+          <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg">
             A versatile, electric robotic platform engineered for the rugged demands of field operations. BhoomiBot combines industrial durability with intelligent control.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
@@ -39,12 +39,12 @@ export function MeetBhoomiBot() {
               height={800}
               className="w-full h-auto object-cover rounded-2xl grayscale-[0.2] group-hover:grayscale-0 transition-all duration-700"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-8">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6 sm:p-8">
                 <p className="text-white text-xs font-mono uppercase tracking-[0.3em]">Engineering Prototype: v2.4 Chassis</p>
             </div>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {specs.map((item, index) => (
               <motion.div
                 key={item.title}

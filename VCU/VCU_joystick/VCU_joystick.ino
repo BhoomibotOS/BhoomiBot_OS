@@ -17,8 +17,8 @@
 // ----------------------------- Calibration Macros -----------------------------
 #define DRIVE_CALIB_L_UP    2.2f
 #define DRIVE_CALIB_L_DOWN  2.2f
-#define DRIVE_CALIB_R_UP    2.22f
-#define DRIVE_CALIB_R_DOWN  2.22f
+#define DRIVE_CALIB_R_UP    2.24f //2.22
+#define DRIVE_CALIB_R_DOWN  2.24f
 
 #define MIN_PWM_L    35
 #define MIN_PWM_R    35

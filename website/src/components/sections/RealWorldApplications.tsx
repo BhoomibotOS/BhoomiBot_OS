@@ -14,7 +14,7 @@ const apps = [
 export function RealWorldApplications() {
   return (
     <section id="applications-grid" className="py-24 bg-white dark:bg-black">
-      <div className="container mx-auto px-4">
+      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-6">Real-World Applications</h2>
           <p className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">

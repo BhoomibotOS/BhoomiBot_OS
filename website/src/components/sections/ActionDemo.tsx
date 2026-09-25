@@ -141,7 +141,7 @@ export function ActionDemo() {
 
   return (
     <section id="demo" className="py-24 bg-slate-50 dark:bg-zinc-950 overflow-hidden">
-      <div className="container mx-auto px-4">
+      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="flex flex-col items-center text-center mb-16">
           <div className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold tracking-wider uppercase mb-4">
             Interactive Demo

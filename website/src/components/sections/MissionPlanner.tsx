@@ -8,7 +8,7 @@ import { Target, Zap, Shield, Smartphone, Globe } from "lucide-react"
 export function MissionPlanner() {
   return (
     <section id="planner" className="py-24 bg-white dark:bg-black overflow-hidden">
-      <div className="container mx-auto px-4">
+      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
           <div className="lg:col-span-5">
             <div className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold tracking-wider uppercase mb-6">

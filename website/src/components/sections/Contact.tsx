@@ -46,14 +46,14 @@ export function Contact() {
   }
 
   return (
-    <section id="contact" className="py-24 bg-white dark:bg-black overflow-hidden">
-      <div className="container mx-auto px-4">
-        <div className="max-w-6xl mx-auto bg-slate-900 rounded-[3rem] overflow-hidden shadow-2xl relative">
+    <section id="contact" className="py-16 sm:py-24 bg-white dark:bg-black overflow-hidden">
+      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12">
+        <div className="w-full bg-slate-900 rounded-3xl sm:rounded-[3rem] overflow-hidden shadow-2xl relative">
           <div className="grid grid-cols-1 lg:grid-cols-2">
-            <div className="p-12 lg:p-20 text-white flex flex-col justify-between">
+            <div className="p-6 sm:p-12 lg:p-20 text-white flex flex-col justify-between">
               <div>
-                <h2 className="text-4xl md:text-6xl font-black tracking-tighter mb-6">Ready to Explore BhoomiBot?</h2>
-                <p className="text-slate-400 text-lg mb-10 leading-relaxed">
+                <h2 className="text-3xl sm:text-4xl md:text-6xl font-black tracking-tighter mb-6">Ready to Explore BhoomiBot?</h2>
+                <p className="text-slate-400 text-base sm:text-lg mb-10 leading-relaxed">
                   Schedule a demonstration or speak with our engineering team to see how BhoomiBot can transform your operations.
                 </p>
 
@@ -64,7 +64,7 @@ export function Contact() {
                     </div>
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Email Us</p>
-                      <span className="font-bold text-lg">info@bhoomibot.com</span>
+                      <span className="font-bold text-base sm:text-lg">info@bhoomibot.com</span>
                     </div>
                   </div>
 
@@ -74,7 +74,7 @@ export function Contact() {
                     </div>
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">LinkedIn</p>
-                      <a href="https://linkedin.com/company/bhoomibot" target="_blank" rel="noopener noreferrer" className="font-bold text-lg hover:text-primary transition-colors">
+                      <a href="https://linkedin.com/company/bhoomibot" target="_blank" rel="noopener noreferrer" className="font-bold text-base sm:text-lg hover:text-primary transition-colors">
                         BhoomiBot AI Labs
                       </a>
                     </div>
@@ -86,7 +86,7 @@ export function Contact() {
                     </div>
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Location</p>
-                      <span className="font-bold text-lg">Ecity phase 1, Bengaluru, Karnataka, 560100</span>
+                      <span className="font-bold text-base sm:text-lg">Ecity phase 1, Bengaluru, Karnataka, 560100</span>
                     </div>
                   </div>
                 </div>
@@ -98,7 +98,7 @@ export function Contact() {
               </div>
             </div>
 
-            <div className="bg-white p-12 lg:p-20">
+            <div className="bg-white p-6 sm:p-12 lg:p-20">
               <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
